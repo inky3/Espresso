@@ -1,0 +1,40 @@
+{
+  "name": "seb-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.64",
+    "@ai-sdk/groq": "^3.0.35",
+    "@ai-sdk/react": "^3.0.170",
+    "@openrouter/ai-sdk-provider": "^2.8.0",
+    "ai": "^6.0.168",
+    "clsx": "^2.1.1",
+    "firebase": "^12.12.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.8.0",
+    "mermaid": "^11.14.0",
+    "next": "16.2.4",
+    "openai": "^6.34.0",
+    "pdf.js-extract": "^1.0.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
