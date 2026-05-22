@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { db } from '../../lib/firebase'; 
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion } from 'firebase/firestore'; 
 
-export function useSebAI() {
+export function useEspressoAI() {
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'online' | 'unstable' | 'offline'>('online');
@@ -23,7 +23,7 @@ export function useSebAI() {
 
   // 1. NEURAL INITIALIZATION & CLOUD CLAIM
   const silentInitialize = useCallback(async () => {
-    const localSaved = localStorage.getItem('seb_memory');
+    const localSaved = localStorage.getItem('espresso_memory');
     const initial = localSaved ? JSON.parse(localSaved) : { home: null, work: null, projects: [] };
     
     const cloudTimeout = new Promise((_, reject) => 
@@ -31,14 +31,14 @@ export function useSebAI() {
     );
 
     try {
-      const docRef = doc(db, "seb_core", "B"); 
+      const docRef = doc(db, "espresso_core", "B"); 
       const fetchDoc = getDoc(docRef).catch(() => null);
       const docSnap = await Promise.race([fetchDoc, cloudTimeout]) as any;
 
       if (docSnap && docSnap.exists()) {
         const cloudData = docSnap.data().memory;
         setMemory({ ...cloudData, active_document: null }); // Don't carry over old PDFs on refresh
-        localStorage.setItem('seb_memory', JSON.stringify(cloudData));
+        localStorage.setItem('espresso_memory', JSON.stringify(cloudData));
         setConnectionStatus('online');
       } else if (docSnap) {
         await setDoc(docRef, { owner: "B", identity: "3D & Motion Graphic Designer, Frontend Developer, and Strategist.", memory: initial, lastSync: serverTimestamp() });
@@ -62,12 +62,12 @@ export function useSebAI() {
 
     const updatedMemory = { ...memory, [category]: data };
     setMemory(updatedMemory);
-    localStorage.setItem('seb_memory', JSON.stringify(updatedMemory));
+    localStorage.setItem('espresso_memory', JSON.stringify(updatedMemory));
 
     if (connectionStatus !== 'online') return;
 
     try {
-      const docRef = doc(db, "seb_core", "B"); 
+      const docRef = doc(db, "espresso_core", "B"); 
       updateDoc(docRef, { [`memory.${category}`]: category === 'personal_tags' ? arrayUnion(data) : data, lastUpdate: serverTimestamp() }).catch(() => null);
     } catch (e) { console.error("Cloud Archive Failed:", e); }
   }, [memory, connectionStatus]);
@@ -140,7 +140,7 @@ export function useSebAI() {
     }
 
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`, { headers: { 'User-Agent': 'SebAI-B-Assistant' } });
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`, { headers: { 'User-Agent': 'Espresso-Assistant' } });
       const data = await res.json();
       
       if (!data?.[0]) return null;

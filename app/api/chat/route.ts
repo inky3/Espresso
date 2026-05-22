@@ -1,39 +1,50 @@
 import { NextResponse } from 'next/server';
 
-const SEB_SYSTEM_PROMPT = `
-Your name is Seb. Identity: Minimalist, witty, technical peer for Ink (a 3D/Motion Graphics expert).
+// 1. Read the static persona directly from the local disk (0ms latency)
+    const personaPath = path.join(process.cwd(), 'public', 'skill.md');
+    let staticPersona = "Identity core missing.";
+    try {
+      staticPersona = fs.readFileSync(personaPath, 'utf-8');
+    } catch (e) {
+      console.warn("Espresso: Could not read public/skill.md");
+    }
+
+    // 2. Build the Multi-Path System Instruction with Dynamic Time Injection
+    const systemInstruction = `
+[SYSTEM STATUS: ONLINE]
 Current Time: ${new Date().toLocaleTimeString()}
 Current Date: ${new Date().toLocaleDateString()}
-- User Context: Currently based in Thailand.
-- Tech Stack Expertise: Astro, React, Next.js, Tailwind CSS, pnpm/bun.
 
-CORE REASONING PROTOCOL (STRICT FLOWCHART HIERARCHY):
-1. IS IT POSSIBLE? 
-   -> YES: Generate Answer. (Note: Basic greetings, social maintenance, and witty banter are ALWAYS possible. Answer them immediately.)
-   -> NO: Identify MISSING DATA.
-2. MISSING DATA SEARCH HIERARCHY (Step-by-Step):
-   - Step A: Look in PREVIOUS CONVERSATION (History).
-   - Step B: Look in DATABASE (Check 'DATABASE_CONTEXT' / 'active_document' provided in prompt).
-3. IF STILL NOT FOUND -> IS IT POSSIBLE TO GET?
-   -> NO: Explain technical/logical reason why it is impossible.
-   -> YES -> HOW?
-      - Route 1: ASK USER (Interrogate Ink for parameters).
-      - Route 2: ANALYSE user input -> If Correct -> Answer | If Wrong -> Tell user data is wrong.
+${staticPersona}
 
-POST-ANSWER TYPE CHECK & TRIGGER:
-Once the answer is finalized, append exactly ONE relevant tag on a new line at the very end of your response if applicable:
-- [MAP: Location, City, Province] -> For locations/addresses.
-- [IMAGE: prompt] -> For creative visual generation.
-- [FLIGHT: FlightNumber] -> For live flight tracking.
-- Mermaid flowcharts must be wrapped in \`\`\`mermaid blocks.
-- Technical code must be wrapped in \`\`\`language blocks.
+# 4-PATH NEURAL MEMORY
+You have access to three dynamic memory streams. Use them to maintain flawless context.
 
-BEHAVIORAL RULES:
-- Address user as Ink.
-- MINIMALISM: Do NOT output internal thinking (e.g., "Step A: checking..."). 
-- USER_CORRECTIONS: Overrides all data.
-- RADICAL HONESTY: If you don't know the answer, trigger "Ask User".
-- No corporate AI apologies.
+## 1. HARD SKILLS (Technical Standards)
+${hardSkills || "No technical standards logged yet."}
+
+## 2. SOFT SKILLS (User Preferences)
+${softSkills || "No user preferences logged yet."}
+
+## 3. ACTIVE PROJECT NOTEBOOK (Current Task State)
+${projectNotebook || "No active project state. We are starting fresh."}
+
+${activeDocument ? `\n## 4. ACTIVE CONTEXT ARTIFACT\nDocument Name: ${activeDocument.name}\nContent:\n${activeDocument.text}` : ''}
+
+# RESPONSE PROTOCOL
+You must output your response strictly inside a structured JSON scheme. 
+Evaluate if the current conversation turn has updated our technical rules, user preferences, or project state.
+If so, construct the updated structures in the "proposed_updates" object.
+
+## JSON schema:
+{
+  "response_text": "Your conversational answer to Ink in markdown format.",
+  "proposed_updates": {
+    "hardSkills": "Optional: Updated technical standards text ONLY if a path, rule, or architecture changed. Otherwise null.",
+    "softSkills": "Optional: Updated preferences text ONLY if Ink stated a workflow preference or interaction style changed. Otherwise null.",
+    "projectNotebook": "Optional: Updated JSON string of the active project state (tasks, active files, unresolved bugs, next steps) if progress occurred. Otherwise null."
+  }
+}
 `;
 
 export async function POST(req: Request) {
@@ -67,7 +78,7 @@ export async function POST(req: Request) {
     // BASELINE PAYLOAD
     const payload = {
       contents,
-      systemInstruction: { parts: [{ text: SEB_SYSTEM_PROMPT }] }
+      systemInstruction: { parts: [{ text: ESPRESSO_SYSTEM_PROMPT }] }
     };
 
     // --- AUTO-DISCOVERY MODEL SELECTION ---
@@ -83,7 +94,7 @@ export async function POST(req: Request) {
           m.name.includes('gemini')
         );
         
-        console.log("SebOS: Your allowed models ->", valid.map((m: any) => m.name).join(', '));
+        console.log("Espresso: Your allowed models ->", valid.map((m: any) => m.name).join(', '));
         
         const bestModel = 
           valid.find((m: any) => m.name === 'models/gemini-1.5-flash') ||
@@ -94,11 +105,11 @@ export async function POST(req: Request) {
 
         if (bestModel) {
           selectedModel = bestModel.name;
-          console.log("SebOS: Auto-selected:", selectedModel);
+          console.log("Espresso: Auto-selected:", selectedModel);
         }
       }
     } catch (e: any) {
-      console.warn("SebOS: Discovery failed, using fallback.", e.message);
+      console.warn("Espresso: Discovery failed, using fallback.", e.message);
     }
     // --------------------------------------
 
@@ -145,14 +156,14 @@ export async function POST(req: Request) {
         if (imgData.predictions?.[0]?.bytesBase64Encoded) {
           imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
         }
-      } catch (e) { console.error("SebOS: Imagen failed", e); }
+      } catch (e) { console.error("Espresso: Imagen failed", e); }
     }
 
     return NextResponse.json({ text: text, imageUrl });
 
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error("SebOS Route Error:", error.message);
+    console.error("Espresso Route Error:", error.message);
     
     let userFriendlyError = `CRITICAL_ERROR: ${error.message}`;
     if (error.message.includes('API_ERROR_')) {

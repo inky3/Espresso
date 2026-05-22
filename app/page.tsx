@@ -38,10 +38,10 @@ const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
 
-const appId = 'seb-ai-terminal'; 
+const appId = 'espresso-ai-terminal'; 
 
 // --- CORE AI HOOK ---
-function useSebAI() {
+function useEspressoAI() {
   const [messages, setMessages] = useState<any[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -54,7 +54,7 @@ function useSebAI() {
       try {
         await signInAnonymously(auth);
       } catch (err) {
-        console.error("SebOS Auth Error:", err);
+        console.error("Espresso Auth Error:", err);
       }
     };
     initAuth();
@@ -88,10 +88,10 @@ function useSebAI() {
 
           const latestDoc = allDocs[0];
           setActiveDocument({ name: latestDoc.name, text: latestDoc.text });
-          console.log(`SebOS: Silent neural link restored for [${latestDoc.name}]`);
+          console.log(`Espresso: Silent neural link restored for [${latestDoc.name}]`);
         }
       } catch (err: any) {
-        console.error("SebOS Recall Failed:", err.message);
+        console.error("Espresso Recall Failed:", err.message);
       }
     };
 
@@ -258,7 +258,7 @@ const TypewriterText = ({ text }: { text: string }) => {
 
 // --- MAIN APP ---
 export default function App() {
-  const { messages, isTyping, connectionStatus, processCommand, handleFileUpload } = useSebAI();
+  const { messages, isTyping, connectionStatus, processCommand, handleFileUpload } = useEspressoAI();
   const [isBooting, setIsBooting] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -335,7 +335,7 @@ export default function App() {
                 className="absolute inset-0 z-[200] bg-blue-600/10 backdrop-blur-md border-4 border-dashed border-blue-500/40 flex flex-col items-center justify-center pointer-events-none"
               >
                 <FileText size={64} className="text-blue-500 mb-4 animate-bounce" />
-                <span className="text-xl font-bold text-white uppercase tracking-widest">Drop PDF into Seb's Core</span>
+                <span className="text-xl font-bold text-white uppercase tracking-widest">Drop PDF into Espresso's Core</span>
               </motion.div>
             )}
 
@@ -374,7 +374,7 @@ export default function App() {
               <div className="p-3 border-b border-zinc-900 flex justify-between items-center bg-black/40 shrink-0">
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-blue-500' : 'bg-red-500'} shadow-[0_0_8px_rgba(59,130,246,0.3)]`} />
-                  <span className="text-[10px] font-bold text-zinc-100 uppercase tracking-widest">Seb_Terminal</span>
+                  <span className="text-[10px] font-bold text-zinc-100 uppercase tracking-widest">Espresso</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <button onClick={() => setShowCoding(!showCoding)} className={`transition-colors ${showCoding ? 'text-blue-500' : 'text-zinc-600 hover:text-white'}`}><Code size={16} /></button>
@@ -394,7 +394,7 @@ export default function App() {
 
                   return (
                     <div key={i} className={`p-4 rounded-2xl border w-fit max-w-[88%] shadow-sm flex flex-col gap-1 ${msg.role === 'user' ? 'bg-zinc-900 border-zinc-800 ml-auto text-zinc-100' : 'bg-blue-600/5 border-blue-500/10 text-zinc-300'}`}>
-                      <span className="text-[7px] opacity-20 block uppercase font-black">{msg.role === 'user' ? 'Ink' : 'Seb'}</span>
+                      <span className="text-[7px] opacity-20 block uppercase font-black">{msg.role === 'user' ? 'Ink' : 'Espresso'}</span>
                       <div className="flex flex-col gap-2 w-full max-w-full">
                         {parts.map((part: string, pi: number) => {
                           if (part.startsWith('```')) {
@@ -412,7 +412,7 @@ export default function App() {
                         })}
                       </div>
 
-                      {/* Spawns the Button if Seb wrote mermaid code */}
+                      {/* Spawns the Button if Espresso wrote mermaid code */}
                       {mermaidMatch && msg.role === 'assistant' && (
                         <button 
                           onClick={() => triggerVisualization(mermaidMatch[1], 'mermaid')}
@@ -431,7 +431,7 @@ export default function App() {
               <form onSubmit={(e) => { e.preventDefault(); if (inputText.trim()) { processCommand(inputText); setInputText(''); } }} className="p-3 bg-black/40 border-t border-zinc-900 flex gap-2 shrink-0 items-center">
                 <input type="file" ref={fileInputRef} accept="application/pdf" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors"><Plus size={20} /></button>
-                <input className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 px-4 text-white text-[15px] outline-none focus:border-blue-500/30 transition-all" placeholder="Command Seb..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
+                <input className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 px-4 text-white text-[15px] outline-none focus:border-blue-500/30 transition-all" placeholder="Command Espresso..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
                 <button type="submit" className={`p-3 rounded-xl transition-colors ${inputText.trim() ? 'bg-blue-600 text-white' : 'bg-zinc-900/50 text-zinc-600 border border-zinc-800'}`} disabled={!inputText.trim()}><SendHorizontal size={20} /></button>
               </form>
             </motion.aside>
