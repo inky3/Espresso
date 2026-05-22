@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Cpu, ShieldCheck, Plus, SendHorizontal, LayoutPanelLeft, 
-  Workflow, ZoomIn, ZoomOut, Maximize, Copy, Check, Code, X, Plane, FileText
+  Workflow, ZoomIn, ZoomOut, Maximize, Copy, Check, Code, X, FileText
 } from 'lucide-react';
 
 // Firebase Imports
@@ -46,17 +46,16 @@ function useSebAI() {
   const [isTyping, setIsTyping] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline'>('offline');
-  const [showVisuals, setShowVisuals] = useState(false);
-  const [mapCoords, setMapCoords] = useState<{ lat: number, lon: number } | null>(null);
   const [activeDocument, setActiveDocument] = useState<{ name: string, text: string } | null>(null);
 
-  // AUTH HANDSHAKE
   useEffect(() => {
     if (!auth) return;
     const initAuth = async () => {
       try {
         await signInAnonymously(auth);
-      } catch (err) { console.error("SebOS Auth Error:", err); }
+      } catch (err) {
+        console.error("SebOS Auth Error:", err);
+      }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -66,25 +65,21 @@ function useSebAI() {
     return () => unsubscribe();
   }, []);
 
-  // PERSISTENCE: Restore document from memory on reload
+  // SILENT PERSISTENCE: Restore document from memory on reload
   useEffect(() => {
     if (!user || !db) return;
 
     const restoreMemory = async () => {
       try {
-        console.log("SebOS: Attempting cloud memory recall...");
-        // RULE 2: Simple collection query, no limit/orderBy to prevent index errors
         const docRef = collection(db, 'artifacts', appId, 'public', 'data', 'documents');
         const querySnapshot = await getDocs(docRef);
         
         if (!querySnapshot.empty) {
-          // Fetch all and sort in memory by createdAt to get the latest
           const allDocs = querySnapshot.docs.map(d => ({ 
             id: d.id, 
             ...d.data() 
           } as any));
           
-          // Sort by createdAt descending
           allDocs.sort((a: any, b: any) => {
             const timeA = a.createdAt?.seconds || 0;
             const timeB = b.createdAt?.seconds || 0;
@@ -93,16 +88,10 @@ function useSebAI() {
 
           const latestDoc = allDocs[0];
           setActiveDocument({ name: latestDoc.name, text: latestDoc.text });
-          
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: `Neural link restored. Active document: [${latestDoc.name}]. I am ready to discuss the data.`, 
-            timestamp: Date.now() 
-          }]);
-          console.log("SebOS: Cloud memory sync complete.");
+          console.log(`SebOS: Silent neural link restored for [${latestDoc.name}]`);
         }
       } catch (err: any) {
-        console.error("SebOS Memory Recall Failed:", err.message);
+        console.error("SebOS Recall Failed:", err.message);
       }
     };
 
@@ -126,17 +115,12 @@ function useSebAI() {
       });
       const data = await response.json();
       const assistantMsg = { role: 'assistant', content: data.text, timestamp: Date.now() };
-      
-      const mapMatch = data.text.match(/\[MAP:\s*(-?\d+\.?\d*),\s*(-?\d+\.?\d*)\]/);
-      if (mapMatch) {
-        setMapCoords({ lat: parseFloat(mapMatch[1]), lon: parseFloat(mapMatch[2]) });
-        setShowVisuals(true);
-      }
-      
       setMessages(prev => [...prev, assistantMsg]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: "CRITICAL_ERROR: Neural Link failed.", timestamp: Date.now() }]);
-    } finally { setIsTyping(false); }
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleFileUpload = async (file: File) => {
@@ -157,29 +141,24 @@ function useSebAI() {
         const docData = { name: data.name, text: data.text };
         setActiveDocument(docData);
 
-        // SAVE TO FIREBASE (RULE 1 Path)
         if (user && db) {
-          try {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'documents'), {
-              ...docData,
-              owner: user.uid,
-              createdAt: serverTimestamp()
-            });
-            console.log("SebOS: Document committed to cloud memory.");
-          } catch (dbErr: any) {
-            console.error("SebOS Cloud Write Failed:", dbErr.message);
-            setMessages(prev => [...prev, { role: 'assistant', content: "SYSTEM_ALERT: Cloud Sync failed. Check Firebase Rules.", timestamp: Date.now() }]);
-          }
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'documents'), {
+            ...docData,
+            owner: user.uid,
+            createdAt: serverTimestamp()
+          });
         }
 
-        setMessages(prev => [...prev, { role: 'assistant', content: `Document [${data.name}] integrated and synced.`, timestamp: Date.now() }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: `Document [${data.name}] integrated and synced to neural core.`, timestamp: Date.now() }]);
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: "SYSTEM_ALERT: PDF processing failed.", timestamp: Date.now() }]);
-    } finally { setIsTyping(false); }
+    } finally {
+      setIsTyping(false);
+    }
   };
 
-  return { messages, isTyping, connectionStatus, showVisuals, setShowVisuals, processCommand, mapCoords, handleFileUpload, user };
+  return { messages, isTyping, connectionStatus, processCommand, handleFileUpload };
 }
 
 // --- SUB-COMPONENTS ---
@@ -248,7 +227,7 @@ const CodeBlock = ({ code, language, onOpen }: { code: string, language: string,
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div className="my-2 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-md w-full">
+    <div className="my-2 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-md w-full max-w-full">
       <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/80 border-b border-zinc-800">
         <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest">{language || 'Code'}</span>
         <div className="flex items-center gap-3">
@@ -258,7 +237,7 @@ const CodeBlock = ({ code, language, onOpen }: { code: string, language: string,
           </button>
         </div>
       </div>
-      <pre className="p-4 overflow-x-auto text-zinc-300 text-xs font-mono"><code>{code}</code></pre>
+      <div className="p-4 overflow-x-auto text-zinc-300 text-xs font-mono leading-relaxed"><pre><code>{code}</code></pre></div>
     </div>
   );
 };
@@ -279,15 +258,19 @@ const TypewriterText = ({ text }: { text: string }) => {
 
 // --- MAIN APP ---
 export default function App() {
-  const { messages, isTyping, connectionStatus, showVisuals, setShowVisuals, processCommand, mapCoords, handleFileUpload } = useSebAI();
+  const { messages, isTyping, connectionStatus, processCommand, handleFileUpload } = useSebAI();
   const [isBooting, setIsBooting] = useState(true);
   const [inputText, setInputText] = useState('');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  
+  // States for Visual Dock & Workspace
+  const [showVisuals, setShowVisuals] = useState(false);
   const [vdMode, setVdMode] = useState<'map' | 'mermaid' | 'flight'>('map');
   const [activeMermaid, setActiveMermaid] = useState<string>('');
+  const [mapCoords, setMapCoords] = useState<{ lat: number, lon: number } | null>(null);
   const [showCoding, setShowCoding] = useState(false);
   const [activeCode, setActiveCode] = useState('');
   const [activeLang, setActiveLang] = useState('plaintext');
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -318,7 +301,17 @@ export default function App() {
     if (file) handleFileUpload(file);
   };
 
-  const triggerCodingScreen = (code: string, lang: string) => { setActiveCode(code); setActiveLang(lang); setShowCoding(true); };
+  const triggerCodingScreen = (code: string, lang: string) => { 
+    setActiveCode(code); 
+    setActiveLang(lang); 
+    setShowCoding(true); 
+  };
+
+  const triggerVisualization = (code: string, mode: 'map' | 'mermaid' | 'flight') => {
+    if (mode === 'mermaid') setActiveMermaid(code);
+    setVdMode(mode);
+    setShowVisuals(true);
+  };
 
   return (
     <div 
@@ -329,7 +322,7 @@ export default function App() {
     >
       <AnimatePresence>
         {isBooting ? (
-          <motion.div exit={{ opacity: 0 }} className="absolute inset-0 z-[100] bg-black flex flex-col items-center justify-center">
+          <motion.div key="boot" exit={{ opacity: 0 }} className="absolute inset-0 z-[100] bg-black flex flex-col items-center justify-center">
              <Cpu size={42} className="text-blue-500 mb-4 animate-pulse" />
              <span className="text-[10px] tracking-widest text-zinc-700 uppercase">Neural_Core_Syncing...</span>
           </motion.div>
@@ -342,13 +335,14 @@ export default function App() {
                 className="absolute inset-0 z-[200] bg-blue-600/10 backdrop-blur-md border-4 border-dashed border-blue-500/40 flex flex-col items-center justify-center pointer-events-none"
               >
                 <FileText size={64} className="text-blue-500 mb-4 animate-bounce" />
-                <span className="text-xl font-bold text-white uppercase tracking-widest">Drop into Seb's Core</span>
+                <span className="text-xl font-bold text-white uppercase tracking-widest">Drop PDF into Seb's Core</span>
               </motion.div>
             )}
 
+            {/* VISUAL DOCK & CODING WORKSPACE */}
             {(showVisuals || showCoding) && (
               <motion.div 
-                layout initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+                layout initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -50, opacity: 0 }}
                 className={`w-full md:h-full flex flex-col md:flex-row shrink-0 border-b md:border-b-0 md:border-r border-zinc-900 z-30 ${showVisuals && showCoding ? 'md:w-2/3' : 'md:w-1/2'}`}
               >
                 {showCoding && (
@@ -376,10 +370,10 @@ export default function App() {
               </motion.div>
             )}
 
-            <motion.aside layout className="flex-1 flex flex-col min-h-0 bg-zinc-950">
-              <div className="p-3 border-b border-zinc-900 flex justify-between items-center bg-black/40">
+            <motion.aside layout className="flex-1 flex flex-col min-h-0 min-w-0 bg-zinc-950 relative z-20">
+              <div className="p-3 border-b border-zinc-900 flex justify-between items-center bg-black/40 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-blue-500' : 'bg-red-500'}`} />
+                  <div className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-blue-500' : 'bg-red-500'} shadow-[0_0_8px_rgba(59,130,246,0.3)]`} />
                   <span className="text-[10px] font-bold text-zinc-100 uppercase tracking-widest">Seb_Terminal</span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -388,45 +382,57 @@ export default function App() {
                   <ShieldCheck size={14} className="text-zinc-800" />
                 </div>
               </div>
-              <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto space-y-4 text-xs scrollbar-hide">
-                {messages.map((msg, i) => {
+
+              <div ref={scrollRef} className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4 text-xs scrollbar-hide">
+                {messages.length === 0 && (
+                   <div className="text-[10px] text-zinc-600 mt-4 italic opacity-50">Handshake complete. Awaiting command...</div>
+                )}
+                {messages.map((msg: any, i: number) => {
                   const parts = msg.content.split(/(```[\s\S]*?```)/g);
-                  let hasMermaid = false;
-                  let mermaidCode = '';
+                  const mermaidRegex = /```mermaid\s+([\s\S]*?)```/;
+                  const mermaidMatch = msg.content.match(mermaidRegex);
 
                   return (
-                    <div key={i} className={`p-4 rounded-2xl border w-fit max-w-[88%] ${msg.role === 'user' ? 'bg-zinc-900 border-zinc-800 ml-auto text-zinc-100' : 'bg-blue-600/5 border-blue-500/10 text-zinc-300'}`}>
-                      <span className="text-[7px] opacity-20 block uppercase font-black mb-1">{msg.role === 'user' ? 'Ink' : 'Seb'}</span>
-                      <div className="flex flex-col gap-3">
-                        {parts.map((part: string, partIndex: number) => {
+                    <div key={i} className={`p-4 rounded-2xl border w-fit max-w-[88%] shadow-sm flex flex-col gap-1 ${msg.role === 'user' ? 'bg-zinc-900 border-zinc-800 ml-auto text-zinc-100' : 'bg-blue-600/5 border-blue-500/10 text-zinc-300'}`}>
+                      <span className="text-[7px] opacity-20 block uppercase font-black">{msg.role === 'user' ? 'Ink' : 'Seb'}</span>
+                      <div className="flex flex-col gap-2 w-full max-w-full">
+                        {parts.map((part: string, pi: number) => {
                           if (part.startsWith('```')) {
                             const match = part.match(/```([\w-]*)\s*([\s\S]*?)```/);
-                            if (match) {
-                              const lang = match[1] || 'plaintext';
-                              const code = match[2].trim();
-                              if (lang === 'mermaid') { hasMermaid = true; mermaidCode = code; return null; }
-                              return <CodeBlock key={partIndex} code={code} language={lang} onOpen={() => triggerCodingScreen(code, lang)} />;
-                            }
+                            const lang = match?.[1] || 'text';
+                            if (lang === 'mermaid') return null; // Handle via button below
+                            return <CodeBlock key={pi} code={match?.[2] || ''} language={lang} onOpen={() => triggerCodingScreen(match?.[2] || '', lang)} />;
                           }
                           if (!part.trim()) return null;
-                          return msg.role === 'assistant' ? <TypewriterText key={partIndex} text={part} /> : <span key={partIndex}>{part}</span>;
+                          return msg.role === 'assistant' ? (
+                            <TypewriterText key={pi} text={part} />
+                          ) : (
+                            <span key={pi} className="whitespace-pre-wrap">{part}</span>
+                          );
                         })}
                       </div>
-                      {hasMermaid && msg.role === 'assistant' && (
-                        <button onClick={() => { setVdMode('mermaid'); setActiveMermaid(mermaidCode); setShowVisuals(true); }} className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-blue-500 hover:text-white transition-all w-fit mt-2">
-                          <Workflow size={14} /> <span className="text-[10px] font-bold uppercase tracking-widest">Visual Analysis</span>
+
+                      {/* Spawns the Button if Seb wrote mermaid code */}
+                      {mermaidMatch && msg.role === 'assistant' && (
+                        <button 
+                          onClick={() => triggerVisualization(mermaidMatch[1], 'mermaid')}
+                          className="flex items-center gap-2 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-blue-500 hover:bg-zinc-800 hover:text-white transition-all w-fit mt-3"
+                        >
+                          <Workflow size={14} />
+                          <span className="text-[10px] font-bold tracking-wider uppercase">Show Visualization</span>
                         </button>
                       )}
                     </div>
                   );
                 })}
-                {isTyping && <div className="text-[9px] text-blue-500/40 animate-pulse pl-2 tracking-widest italic">THINKING...</div>}
+                {isTyping && <div className="text-[9px] text-blue-500/40 animate-pulse pl-2 italic tracking-widest">THINKING...</div>}
               </div>
-              <form onSubmit={(e) => { e.preventDefault(); processCommand(inputText); setInputText(''); }} className="p-3 border-t border-zinc-900 flex gap-2 items-center bg-black/20">
-                <input type="file" ref={fileInputRef} accept=".pdf" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors"><Plus size={20} /></button>
-                <input className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-3 px-4 text-white text-[15px] outline-none focus:border-blue-500/20" placeholder="Command Seb..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
-                <button type="submit" className="p-3 bg-blue-600 text-white rounded-xl disabled:opacity-50" disabled={!inputText.trim()}><SendHorizontal size={20} /></button>
+
+              <form onSubmit={(e) => { e.preventDefault(); if (inputText.trim()) { processCommand(inputText); setInputText(''); } }} className="p-3 bg-black/40 border-t border-zinc-900 flex gap-2 shrink-0 items-center">
+                <input type="file" ref={fileInputRef} accept="application/pdf" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]); }} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors"><Plus size={20} /></button>
+                <input className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 px-4 text-white text-[15px] outline-none focus:border-blue-500/30 transition-all" placeholder="Command Seb..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
+                <button type="submit" className={`p-3 rounded-xl transition-colors ${inputText.trim() ? 'bg-blue-600 text-white' : 'bg-zinc-900/50 text-zinc-600 border border-zinc-800'}`} disabled={!inputText.trim()}><SendHorizontal size={20} /></button>
               </form>
             </motion.aside>
           </motion.div>
