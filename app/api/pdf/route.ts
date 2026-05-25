@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error("SebOS PDF Error:", error.message);
+    console.error("Espresso PDF Error:", error.message);
     return NextResponse.json({ error: "Failed to process document" }, { status: 500 });
   }
 }
