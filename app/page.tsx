@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, X, Map as MapIcon, Plane, Workflow, Code,
@@ -236,6 +236,52 @@ function useEspressoAI() {
   return { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, processCommand, fetchOrderBook, orderBookItems };
 }
 
+// --- NETWORK STATUS DOT ---
+const NET_DETAILS: Record<string, { desc: string }> = {
+  full:     { desc: "Internet connected · Database synced" },
+  partial:  { desc: "Internet connected · Database offline" },
+  unstable: { desc: "Internet unstable or slow" },
+  poor:     { desc: "Very poor connection · 2G or lower" },
+  offline:  { desc: "No internet connection" },
+};
+
+function NetworkStatusDot({ netStatus, netColors, netLabels }: { netStatus: string; netColors: Record<string, string>; netLabels: Record<string, string> }) {
+  const [visible, setVisible] = useState(false);
+  const detail = NET_DETAILS[netStatus];
+  const isPulsing = netStatus === 'unstable' || netStatus === 'poor';
+
+  return (
+    <div className="relative flex items-center" onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)} onClick={() => setVisible(v => !v)}>
+      <div className="relative cursor-pointer p-1">
+        <div className={`size-2 rounded-full ${netColors[netStatus]} ${isPulsing ? 'animate-pulse' : ''}`} />
+      </div>
+      <AnimatePresence>
+        {visible && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 pointer-events-none"
+          >
+            <div className="bg-[#0A0A0A] border border-zinc-800 rounded-xl px-3 py-2.5 shadow-2xl min-w-[180px] text-center">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <div className={`size-1.5 rounded-full ${netColors[netStatus]}`} />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-100">{netLabels[netStatus]}</span>
+              </div>
+              <p className="font-mono text-[9px] text-zinc-500 leading-relaxed">{detail.desc}</p>
+            </div>
+            {/* Arrow */}
+            <div className="flex justify-center -mt-px">
+              <div className="w-2 h-2 bg-[#0A0A0A] border-l border-t border-zinc-800 rotate-45 -mt-1" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // --- COMPONENTS ---
 function SidePanel({ open, title, subtitle, icon: Icon, onClose, isWide, children }: any) {
   // Dynamically expands to EXACTLY 2/3 of the screen for Maps/Displays using Tailwind fractions
@@ -366,8 +412,6 @@ export default function App() {
     setInputText('');
   };
 
-  const headerRight = useMemo(() => (status === 'idle' ? 'Idle' : status === 'pulling' ? 'Extracting' : 'Active'), [status]);
-  
   const netColors = {
     full: 'bg-[#10B981] shadow-[0_0_8px_rgba(16,185,129,0.5)]', 
     partial: 'bg-[#84CC16] shadow-[0_0_8px_rgba(132,204,22,0.5)]', 
@@ -432,22 +476,12 @@ export default function App() {
         <header className="w-full px-6 sm:px-12 py-5 flex justify-between items-center shrink-0 z-10 bg-gradient-to-b from-[#050505] to-transparent">
           <div className="flex items-center gap-4">
             <EspressoMark size={32} />
-            <div className="leading-tight">
-              <div className="flex items-center gap-3">
-                <p className="font-serif italic text-xl text-white tracking-wide">espresso</p>
-                {/* Coffee-Themed Network Status Indicator */}
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900/50 border border-zinc-800">
-                   <div className={`size-1.5 rounded-full ${netColors[netStatus]}`} />
-                   <span className="font-mono text-[8px] uppercase tracking-widest text-zinc-400">{netLabels[netStatus]}</span>
-                </div>
-              </div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-500 mt-1">personal assistant</p>
+            <div className="flex items-center gap-3">
+              <p className="font-serif italic text-xl text-white tracking-wide">espresso</p>
+              {/* Coffee-Themed Network Status — dot only, hover for details */}
+              <NetworkStatusDot netStatus={netStatus} netColors={netColors} netLabels={netLabels} />
             </div>
           </div>
-          <span className="font-mono text-[10px] tracking-[0.25em] text-[#D4AF37] uppercase flex items-center gap-2">
-            <div className={`size-1.5 rounded-full ${status === 'pulling' ? 'bg-[#D4AF37] animate-ping' : status === 'active' ? 'bg-[#D4AF37]' : 'bg-zinc-600'}`} />
-            {headerRight}
-          </span>
         </header>
 
         {/* Conversation Area */}
