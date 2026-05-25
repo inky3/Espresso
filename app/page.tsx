@@ -1,40 +1,81 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ShieldCheck, SendHorizontal, Plus,
-  Map as MapIcon, Workflow, Plane, X, Code, TerminalSquare, FileText, Pin, CheckCircle2, Circle, ArrowRight,
-  Coffee, Droplet, Package, Library // Added Library back since we use it in the UI
+  Plus, X, Map as MapIcon, Plane, Workflow, Code,
+  Coffee, BookOpen, CupSoda, Croissant, Bean, SendHorizontal
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// ✅ Clean Firebase Import
+// Firebase Import
 import { auth, db } from '@/lib/firebase';
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, getDocs, updateDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-// --- ESPRESSO THEME COLORS ---
-const ESPRESSO = '#4B3022';
-const COFFEE = '#6F4E37';
 const appId = 'espresso-terminal'; 
 
-// --- ANIMATED MARKDOWN COMPONENT ---
+type PanelKey = 'display' | 'whiteboard' | 'orderbook' | null;
+
+const PANEL_META: Record<NonNullable<PanelKey>, { title: string; subtitle: string; icon: any; label: string; hint: string }> = {
+  display: { title: "Display", subtitle: "Plated visuals", icon: CupSoda, label: "Display", hint: "images, maps, visuals" },
+  whiteboard: { title: "Whiteboard", subtitle: "Notes · code · drafts", icon: Croissant, label: "Whiteboard", hint: "scratch space" },
+  orderbook: { title: "Order Book", subtitle: "Permanent archive", icon: BookOpen, label: "Order Book", hint: "saved memory" },
+};
+
+// --- LOGO & ANIMATIONS ---
+const EspressoMark = ({ size = 28 }: { size?: number }) => (
+  <div style={{ width: size, height: size }} className="rounded-xl bg-[#D4AF37] grid place-items-center text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]">
+    <Coffee size={size * 0.55} />
+  </div>
+);
+
+const Steam = ({ delay }: { delay: number }) => (
+  <motion.div
+    className="w-1.5 h-8 bg-[#D4AF37]/50 rounded-full blur-sm absolute bottom-0"
+    initial={{ y: 0, opacity: 0, x: 0 }}
+    animate={{ 
+      y: -45, 
+      opacity: [0, 1, 0], 
+      x: [-5, 5, -5] 
+    }}
+    transition={{ duration: 2.5, repeat: Infinity, delay: delay, ease: "easeOut" }}
+  />
+);
+
+const EspressoBootAnimation = ({ progress }: { progress: number }) => {
+  return (
+    <div className="flex flex-col items-center justify-center relative mt-8">
+      <div className="relative w-16 h-12 flex justify-center -mb-2 z-0">
+        <Steam delay={0} />
+        <div className="ml-6"><Steam delay={0.8} /></div>
+        <div className="-ml-6"><Steam delay={1.6} /></div>
+      </div>
+      <div className="relative w-24 h-28 border-[3px] border-[#D4AF37] rounded-b-[2rem] rounded-t-lg overflow-hidden flex items-end p-1 shadow-[0_0_30px_rgba(212,175,55,0.15)] bg-black z-10">
+        <motion.div 
+          className="w-full bg-gradient-to-t from-[#4B3022] to-[#D4AF37] rounded-b-[1.5rem] rounded-t-sm"
+          initial={{ height: "0%" }}
+          animate={{ height: `${progress}%` }}
+          transition={{ ease: "easeInOut", duration: 0.4 }}
+        />
+        <Coffee size={36} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-black mix-blend-overlay opacity-50" />
+      </div>
+      <div className="w-32 h-2.5 bg-[#D4AF37] rounded-full mt-2 shadow-[0_0_20px_rgba(212,175,55,0.4)]" />
+    </div>
+  );
+};
+
+// --- ANIMATED MARKDOWN ---
 function TypewriterMarkdown({ text }: { text: string }) {
   const [displayedText, setDisplayedText] = useState('');
-
   useEffect(() => {
     let i = 0;
-    const speed = 10; 
     const timer = setInterval(() => {
       setDisplayedText(text.slice(0, i));
       i += 4; 
-      if (i > text.length) {
-        setDisplayedText(text);
-        clearInterval(timer);
-      }
-    }, speed);
+      if (i > text.length) { setDisplayedText(text); clearInterval(timer); }
+    }, 10);
     return () => clearInterval(timer);
   }, [text]);
 
@@ -43,21 +84,13 @@ function TypewriterMarkdown({ text }: { text: string }) {
       remarkPlugins={[remarkGfm]}
       components={{
         p: ({node, ...props}) => <p className="mb-4 leading-relaxed last:mb-0" {...props} />,
-        strong: ({node, ...props}) => <strong className="font-semibold text-[#6F4E37]" {...props} />,
+        strong: ({node, ...props}) => <strong className="font-semibold text-[#D4AF37]" {...props} />,
         em: ({node, ...props}) => <em className="italic text-zinc-400" {...props} />,
-        ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 marker:text-[#4B3022]" {...props} />,
-        ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 marker:text-[#4B3022]" {...props} />,
-        li: ({node, ...props}) => <li className="pl-2" {...props} />,
-        h1: ({node, ...props}) => <h1 className="text-xl font-bold text-white mb-4 mt-6" {...props} />,
-        h2: ({node, ...props}) => <h2 className="text-lg font-bold text-white mb-3 mt-5 border-b border-[#4B3022]/30 pb-2" {...props} />,
-        h3: ({node, ...props}) => <h3 className="text-base font-medium text-white mb-2 mt-4" {...props} />,
-        code: ({node, inline, ...props}: any) => 
-          inline ? (
-            <code className="bg-[#4B3022]/20 text-[#6F4E37] px-1.5 py-0.5 rounded text-[13px] font-mono border border-[#4B3022]/30" {...props} />
-          ) : (
-            <code className="block bg-[#050505] border border-[#4B3022]/30 p-4 rounded-xl text-[13px] font-mono overflow-x-auto mb-4 mt-2 text-zinc-300 shadow-sm" {...props} />
-          ),
-        blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[#6F4E37] pl-4 italic text-zinc-400 mb-4 bg-[#4B3022]/10 py-2 pr-4 rounded-r-lg" {...props} />
+        ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 marker:text-[#D4AF37]" {...props} />,
+        ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 marker:text-[#D4AF37]" {...props} />,
+        code: ({node, inline, ...props}: any) => inline 
+          ? <code className="bg-[#D4AF37]/10 text-[#D4AF37] px-1.5 py-0.5 rounded-md text-[13px] font-mono border border-[#D4AF37]/20" {...props} />
+          : <code className="block bg-[#0A0A0A] border border-zinc-800 p-4 rounded-xl text-[13px] font-mono overflow-x-auto mb-4 mt-2 text-zinc-300 shadow-inner" {...props} />,
       }}
     >
       {displayedText}
@@ -65,36 +98,69 @@ function TypewriterMarkdown({ text }: { text: string }) {
   );
 }
 
-// --- DISPLAY SCREEN TYPES ---
-type DisplayView = { type: 'map' | 'flight' | 'code' | 'image', title: string, data: string, language?: string, isPinned?: boolean } | null;
+// --- NETWORK STATUS HOOK ---
+function useNetworkStatus(user: User | null) {
+  const [status, setStatus] = useState<'full' | 'partial' | 'unstable' | 'poor' | 'offline'>('full');
 
+  useEffect(() => {
+    const checkNetwork = () => {
+      if (!navigator.onLine) {
+        setStatus('offline');
+        return;
+      }
+      
+      let isSlow = false;
+      let isPoor = false;
+      
+      if ('connection' in navigator) {
+        const conn = (navigator as any).connection;
+        if (conn.downlink < 1 || conn.effectiveType === '2g') isPoor = true;
+        else if (conn.downlink < 3 || conn.effectiveType === '3g') isSlow = true;
+      }
+
+      if (isPoor) setStatus('poor');
+      else if (isSlow) setStatus('unstable');
+      else if (!user) setStatus('partial');
+      else setStatus('full');
+    };
+
+    checkNetwork();
+    window.addEventListener('online', checkNetwork);
+    window.addEventListener('offline', checkNetwork);
+    if ('connection' in navigator) {
+      (navigator as any).connection.addEventListener('change', checkNetwork);
+    }
+
+    return () => {
+      window.removeEventListener('online', checkNetwork);
+      window.removeEventListener('offline', checkNetwork);
+      if ('connection' in navigator) {
+        (navigator as any).connection.removeEventListener('change', checkNetwork);
+      }
+    };
+  }, [user]);
+
+  return status;
+}
+
+// --- FIREBASE ENGINE ---
 function useEspressoAI() {
   const [messages, setMessages] = useState<any[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline'>('offline');
+  const [status, setStatus] = useState<'idle' | 'pulling' | 'active'>('idle');
   const [activeDocument, setActiveDocument] = useState<{ name: string, text: string } | null>(null);
-  const [displayScreen, setDisplayScreen] = useState<DisplayView>(null);
-
-  // Order Book State
-  const [isOrderBookOpen, setIsOrderBookOpen] = useState(false);
+  const [displayScreen, setDisplayScreen] = useState<any>(null);
   const [orderBookItems, setOrderBookItems] = useState<any[]>([]);
+
+  const netStatus = useNetworkStatus(user);
 
   useEffect(() => {
     if (!auth) return;
-    const initAuth = async () => {
-      try { await signInAnonymously(auth); } 
-      catch (err) { console.error("Espresso Auth Error:", err); }
-    };
-    
+    const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { } };
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        setUser(u);
-        setConnectionStatus('online');
-      } else {
-        setConnectionStatus('offline');
-        initAuth();
-      }
+      if (u) { setUser(u); setStatus('idle'); } 
+      else { setStatus('idle'); initAuth(); }
     });
     return () => unsubscribe();
   }, []);
@@ -106,544 +172,492 @@ function useEspressoAI() {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       items.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setOrderBookItems(items);
-    } catch (err) {
-      console.error("Failed to fetch order book");
-    }
+    } catch (err) {}
   };
 
-  const toggleOrderStatus = async (id: string, currentStatus: string) => {
-    if (!db) return;
-    const newStatus = currentStatus === 'archived' ? 'order' : 'archived';
-    try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', id), { status: newStatus });
-      setOrderBookItems(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
-    } catch (err) {
-      console.error("Failed to update status");
-    }
-  };
-
-  // --- COMMAND HANDLING (/save, /recall, /pin, /seed) ---
-  const handleSlashCommand = async (text: string) => {
-    const args = text.trim().split(' ');
-    const command = args[0].toLowerCase();
-    const payload = args.slice(1).join(' ');
-
-    if (command === '/seed') {
-      if (!user || !db) return true;
-      try {
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Initiating database seed sequence...` }]);
-        
-        await setDoc(doc(db, 'artifacts', appId, 'memory', 'hard'), {
-          content: "# TECHNICAL STANDARDS\n- Framework: Next.js App Router (React), Tailwind CSS.\n- Code Generation: STRICT Single-File Mandate. All components, styling, and logic must be bundled into ONE functional file. No separate CSS files.\n- UI Components: Never use browser `alert()`. Use custom modal UI. Favor rounded corners (rounded-xl, rounded-2xl) and Espresso/Coffee color palettes (#4B3022, #6F4E37).\n- Database: Firebase Firestore strictly mapped to `/artifacts/{appId}/public/data/` paths. No complex compound queries."
-        });
-        
-        await setDoc(doc(db, 'artifacts', appId, 'memory', 'soft'), {
-          content: "# PREFERENCES & HABITS\n- Tone: Highly direct, collaborative, sharp. Ink hates robotic padding.\n- Workflow: Prefers solving issues via the Display Screen Workspace (Shared Whiteboard) rather than printing massive blocks of text into the chat stream.\n- Device: Assume standard desktop view but always ensure touch-targets are sized appropriately for mobile responsiveness."
-        });
-
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Success. Hard and Soft skills have been injected into Firebase.` }]);
-      } catch (err) {
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM_ERROR]** Failed to seed database. Check permissions.` }]);
-      }
-      return true;
-    }
-
-    if (command === '/save') {
-      const title = payload || `Order_${new Date().getTime()}`;
-      if (!user || !db) return;
-      try {
-        const summary = messages.map(m => `${m.role}: ${m.content}`).join('\n').substring(0, 1000);
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'archives'), {
-          title, context: summary, document: activeDocument, createdAt: serverTimestamp(), status: 'order'
-        });
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Order complete. '${title}' securely pinned to the Order Board.` }]);
-      } catch (err) {
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM_ERROR]** Failed to save Order.` }]);
-      }
-      return true;
-    }
-
-    if (command === '/recall') {
-      await fetchOrderBook();
-      setIsOrderBookOpen(true);
-      return true;
-    }
-
-    if (command === '/pin') {
-       if (displayScreen) {
-         setDisplayScreen({ ...displayScreen, isPinned: !displayScreen.isPinned });
-         setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Display Screen pinning ${!displayScreen.isPinned ? 'ENABLED' : 'DISABLED'}.` }]);
-       } else {
-         setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Nothing active on the Display Screen to pin.` }]);
-       }
-       return true;
-    }
-
-    return false;
-  };
-
-  // Add this inside your useEspressoAI hook in app/page.tsx
-const processCommand = async (text: string) => {
-  if (!text.trim()) return;
-  
-  const userMsg = { role: 'user', content: text, timestamp: Date.now() };
-  setMessages(prev => [...prev, userMsg]);
-
-  if (text.startsWith('/')) {
-    const isCommand = await handleSlashCommand(text);
-    if (isCommand) return;
-  }
-
-  setIsTyping(true);
-  try {
-    const requestBody = { 
-      messages: [...messages, userMsg], 
-      activeDocument,
-      workspaceData: displayScreen?.type === 'code' ? displayScreen.data : null,
-      visionImage: displayScreen?.type === 'image' ? displayScreen.data : null 
-    };
-
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody) 
-    });
-    const data = await response.json();
-    const reply = data.text;
-
-    // --- SELF-EVOLUTION INTERCEPTOR ---
-    // Matches: [UPDATE_SKILL: hard | Your new content here]
-    const updateMatch = reply.match(/\[UPDATE_SKILL:\s*(hard|soft)\s*\|\s*(.*?)\]/i);
+  const processCommand = async (text: string, openPanelFn: (k: PanelKey) => void) => {
+    if (!text.trim()) return;
+    const userMsg = { role: 'user', content: text, timestamp: Date.now() };
+    setMessages(prev => [...prev, userMsg]);
     
-    if (updateMatch && db) {
-      const category = updateMatch[1].toLowerCase();
-      const content = updateMatch[2];
-      
-      try {
-        // Espresso commits the update directly to Firebase
-        await setDoc(doc(db, 'artifacts', appId, 'memory', category), { content });
-        
-        // Notify the user in the UI
-        setMessages(prev => [...prev, 
-          { role: 'assistant', content: reply.replace(updateMatch[0], '').trim() }, 
-          { role: 'assistant', content: `**[SYSTEM]** Skill Matrix updated: ${category.toUpperCase()} memory rewritten.` }
-        ]);
-        return; 
-      } catch (e) {
-        setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-      }
-    } else {
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    if (text === '/seed' && user && db) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Injecting Matrix into L2 Cloud Memory...` }]);
+      await setDoc(doc(db, 'artifacts', appId, 'memory', 'hard'), { content: "System Matrix Core active." });
+      await setDoc(doc(db, 'artifacts', appId, 'memory', 'soft'), { content: "System Matrix Core active." });
+      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Success. Matrix injected.` }]);
+      return;
     }
 
-  } catch (error) {
-    setMessages(prev => [...prev, { role: 'assistant', content: "CRITICAL_ERROR: Link failed." }]);
-  } finally { setIsTyping(false); }
-};
-
-  // --- FILE & IMAGE UPLOAD HANDLING ---
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-
-    if (file.type.startsWith('image/')) {
-       const reader = new FileReader();
-       reader.onload = (e) => {
-         const base64 = e.target?.result as string;
-         setDisplayScreen({ type: 'image', title: file.name, data: base64, isPinned: true });
-         setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Visual reference [${file.name}] pinned to Display Screen. Ready for analysis.`, timestamp: Date.now() }]);
-       };
-       reader.readAsDataURL(file);
-       return;
+    if (text.startsWith('/save') && user && db) {
+      const title = text.replace('/save', '').trim() || `Order_${Date.now()}`;
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'archives'), {
+        title, context: "Saved from active context.", createdAt: serverTimestamp(), status: 'order'
+      });
+      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Saved '${title}' to Order Book.` }]);
+      fetchOrderBook();
+      return;
     }
 
+    setStatus('pulling');
     setIsTyping(true);
-    const formData = new FormData();
-    formData.append('file', file);
     try {
-      const res = await fetch('/api/pdf', { method: 'POST', body: formData });
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...messages, userMsg], activeDocument }) 
+      });
       const data = await res.json();
-      if (data.text) {
-        setActiveDocument({ name: data.name, text: data.text });
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Document [${data.name}] integrated and synced to active context.`, timestamp: Date.now() }]);
+      const replyText = data.text;
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: replyText, timestamp: Date.now() }]);
+      
+      // Auto-open panels based on tags
+      const mapMatch = replyText.match(/\[MAP:\s*([^\]]+)\]/i);
+      const flightMatch = replyText.match(/\[FLIGHT:\s*([^\]]+)\]/i);
+      
+      if (mapMatch) {
+        setDisplayScreen({ type: 'map', title: mapMatch[1], data: mapMatch[1] });
+        openPanelFn('display');
+      } else if (flightMatch) {
+        setDisplayScreen({ type: 'flight', title: flightMatch[1], data: flightMatch[1] });
+        openPanelFn('display');
+      } else if (replyText.includes('```')) {
+        openPanelFn('whiteboard');
       }
-    } catch (err) { 
-      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM_ERROR]** Failed to parse document.`, timestamp: Date.now() }]);
-    } finally { setIsTyping(false); }
+
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'assistant', content: "CRITICAL_ERROR: Link failed." }]);
+    } finally { 
+      setStatus('active');
+      setIsTyping(false); 
+    }
   };
 
-  const loadOrderToActive = (order: any) => {
-    if (order.document) setActiveDocument(order.document);
-    setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Order '${order.title}' recalled. Active neural link established.` }]);
-    setIsOrderBookOpen(false);
-  };
-
-  return { 
-    messages, isTyping, connectionStatus, activeDocument, displayScreen, setDisplayScreen, 
-    processCommand, handleFileUpload, fetchOrderBook, isOrderBookOpen, setIsOrderBookOpen, 
-    orderBookItems, toggleOrderStatus, loadOrderToActive 
-  };
+  return { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, processCommand, fetchOrderBook, orderBookItems };
 }
 
+// --- COMPONENTS ---
+function SidePanel({ open, title, subtitle, icon: Icon, onClose, isWide, children }: any) {
+  // Dynamically expands to EXACTLY 2/3 of the screen for Maps/Displays using Tailwind fractions
+  const widthClass = isWide ? 'md:w-2/3' : 'md:w-[400px] lg:w-[450px]';
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ x: '100%', opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: '100%', opacity: 0 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className={`absolute right-0 top-0 bottom-0 w-full ${widthClass} bg-[#050505] border-l border-zinc-800 shadow-2xl z-40 flex flex-col`}
+        >
+          <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between bg-[#0A0A0A]">
+            <div className="flex items-center gap-4">
+              <div className="size-10 bg-zinc-900 rounded-xl flex items-center justify-center text-[#D4AF37] border border-zinc-800 shadow-[0_0_10px_rgba(212,175,55,0.1)]">
+                <Icon size={20} />
+              </div>
+              <div>
+                <h3 className="text-zinc-100 font-medium text-base">{title}</h3>
+                <p className="text-zinc-500 text-[10px] uppercase tracking-[0.2em] font-mono mt-0.5">{subtitle}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-900 rounded-full transition-colors"><X size={18} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 bg-[#050505]">
+            {children}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function PlusMenu({ openPanel, onPick }: { openPanel: PanelKey, onPick: (k: PanelKey) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div className="relative">
+      <button 
+        type="button" 
+        onClick={() => setIsOpen(!isOpen)} 
+        className="size-9 rounded-full grid place-items-center shrink-0 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+      >
+        <Plus size={18} className={`transition-transform duration-200 ${isOpen ? 'rotate-45' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute bottom-full left-0 mb-3 w-64 p-2 bg-[#0A0A0A] border border-zinc-800 rounded-2xl shadow-2xl z-50 flex flex-col"
+          >
+            <p className="px-3 py-2 font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-500">
+              <Bean className="inline size-3 mr-1.5 -mt-0.5 text-[#D4AF37]" /> Workspace
+            </p>
+            <div className="flex flex-col gap-1 mt-1">
+              {Object.entries(PANEL_META).map(([key, meta]) => (
+                <button
+                  key={key}
+                  onClick={() => { onPick(key as PanelKey); setIsOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-2 py-2 rounded-xl text-left transition-colors ${openPanel === key ? 'bg-zinc-900 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
+                >
+                  <div className={`size-8 rounded-lg grid place-items-center shrink-0 transition-colors ${openPanel === key ? 'bg-[#D4AF37] text-black' : 'bg-[#050505] border border-zinc-800 text-[#D4AF37]'}`}>
+                    <meta.icon size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium">{meta.label}</span>
+                    <span className="block font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-500 mt-0.5">{meta.hint}</span>
+                  </div>
+                  {openPanel === key && <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-[#D4AF37] pr-2">open</span>}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// --- MAIN APP ---
 export default function App() {
-  const { 
-    messages, isTyping, connectionStatus, activeDocument, displayScreen, setDisplayScreen, 
-    processCommand, handleFileUpload, fetchOrderBook, isOrderBookOpen, setIsOrderBookOpen, 
-    orderBookItems, toggleOrderStatus, loadOrderToActive 
-  } = useEspressoAI();
+  const [openPanel, setOpenPanel] = useState<PanelKey>(null);
+  const [inputText, setInputText] = useState('');
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   
   const [isBooting, setIsBooting] = useState(true);
-  const [inputText, setInputText] = useState('');
-  const [showActionMenu, setShowActionMenu] = useState(false);
-  const [orderTab, setOrderTab] = useState<'order' | 'archived'>('order');
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bootStep, setBootStep] = useState(0);
 
-  useEffect(() => { setTimeout(() => setIsBooting(false), 1000); }, []);
+  const { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, processCommand, fetchOrderBook, orderBookItems } = useEspressoAI();
+
+  const bootMessages = [
+    "GRINDING BEANS...",
+    "TAMPING NEURAL MATRIX...",
+    "APPLYING 9 BARS OF PRESSURE...",
+    "EXTRACTING WORKSPACE...",
+    "PULL COMPLETE. SYSTEM ONLINE."
+  ];
+
+  useEffect(() => {
+    let stepIndex = 0;
+    const interval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < bootMessages.length) {
+        setBootStep(stepIndex);
+      } else {
+        clearInterval(interval);
+        setTimeout(() => setIsBooting(false), 900);
+      }
+    }, 600);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => { if (openPanel === 'orderbook') fetchOrderBook(); }, [openPanel]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, isTyping]);
 
-  const getLatestAction = (type: 'code' | 'map') => {
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!inputText.trim() || isTyping) return;
+    processCommand(inputText, setOpenPanel);
+    setInputText('');
+  };
+
+  const headerRight = useMemo(() => (status === 'idle' ? 'Idle' : status === 'pulling' ? 'Extracting' : 'Active'), [status]);
+  
+  const netColors = {
+    full: 'bg-[#10B981] shadow-[0_0_8px_rgba(16,185,129,0.5)]', 
+    partial: 'bg-[#84CC16] shadow-[0_0_8px_rgba(132,204,22,0.5)]', 
+    unstable: 'bg-[#EAB308] shadow-[0_0_8px_rgba(234,179,8,0.5)]', 
+    poor: 'bg-[#F97316] shadow-[0_0_8px_rgba(249,115,22,0.5)]', 
+    offline: 'bg-[#EF4444] shadow-[0_0_8px_rgba(239,68,68,0.5)]', 
+  };
+  
+  const netLabels = {
+    full: 'SYNCED & BREWING',
+    partial: 'LOCAL ONLY',
+    unstable: 'UNSTABLE FLOW',
+    poor: 'POOR EXTRACTION',
+    offline: 'MACHINE OFFLINE'
+  };
+
+  const getLatestCode = () => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role === 'assistant') {
-        if (type === 'code') {
-          const codeRegex = new RegExp('`{3}([\\w-]*)\\s*\\n([\\s\\S]*?)`{3}', 'i');
-          const match = msg.content.match(codeRegex);
-          if (match) return { language: match[1] || 'PLAINTEXT', data: match[2] };
-        }
-        if (type === 'map') {
-          const match = msg.content.match(/\[MAP:\s*([^\]]+)\]/i);
-          if (match) return { data: match[1] };
-        }
+        const match = msg.content.match(/```([\w-]*)\n([\s\S]*?)```/);
+        if (match) return { language: match[1], code: match[2] };
       }
     }
-    return type === 'code' ? { language: 'PLAINTEXT', data: '// Initialize empty workspace...' } : { data: 'Earth' };
+    return null;
   };
+  const latestCode = getLatestCode();
+
+  // Dynamic layout constraint. Uses fraction `md:mr-2/3` to perfectly align with SidePanel.
+  const mainMarginClass = openPanel === 'display' ? 'md:mr-2/3' : openPanel ? 'md:mr-[400px] lg:mr-[450px]' : 'mr-0';
 
   return (
-    <div className="flex flex-col md:flex-row h-dvh w-screen bg-[#050505] text-zinc-400 font-sans overflow-hidden relative">
-      {isBooting ? (
-        <div className="absolute inset-0 bg-[#050505] z-50 flex items-center justify-center">
-          <Coffee size={42} className="text-[#6F4E37] animate-pulse" />
-        </div>
-      ) : (
-        <>
-          {/* ========================================= */}
-          {/* THE DISPLAY SCREEN */}
-          {/* ========================================= */}
-          <AnimatePresence>
-            {displayScreen && (
-              <motion.div
-                layout
-                initial={{ opacity: 0, flexBasis: '0%' }}
-                animate={{ opacity: 1, flexBasis: displayScreen.type === 'map' || displayScreen.type === 'flight' || displayScreen.type === 'image' ? '66.666%' : '50%' }}
-                exit={{ opacity: 0, flexBasis: '0%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className={`relative flex flex-col bg-[#050505] border-b md:border-b-0 md:border-r border-[#4B3022]/30 z-20 shadow-2xl overflow-hidden
-                  ${displayScreen.type === 'map' || displayScreen.type === 'flight' || displayScreen.type === 'image' ? 'h-1/2 md:h-full md:w-2/3' : 'h-1/2 md:h-full md:w-1/2'}`}
-              >
-                {/* Header */}
-                <div className="p-3 border-b border-[#4B3022]/30 flex justify-between items-center bg-[#050505]">
-                  <div className="flex items-center gap-2 text-[#6F4E37]">
-                    <span className="text-[10px] font-bold uppercase tracking-widest font-mono">
-                      DISPLAY SCREEN // {displayScreen.type === 'map' ? 'SAT-LINK' : displayScreen.type === 'flight' ? 'RADAR' : displayScreen.type === 'image' ? 'INSPECTOR' : `WORKSPACE [${displayScreen.language || 'RAW'}]`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setDisplayScreen({ ...displayScreen, isPinned: !displayScreen.isPinned })} className={`p-1 transition-colors ${displayScreen.isPinned ? 'text-[#6F4E37]' : 'text-zinc-600 hover:text-[#6F4E37]'}`} title="Pin Display">
-                      <Pin size={14} className={displayScreen.isPinned ? 'fill-current' : ''} />
-                    </button>
-                    <button onClick={() => setDisplayScreen(null)} className="text-zinc-600 hover:text-[#6F4E37] transition-colors p-1">
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 relative overflow-hidden bg-[#000000]">
-                  {displayScreen.type === 'map' && (
-                    <iframe title="Map View" width="100%" height="100%" style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(100%) grayscale(20%)' }} loading="lazy" src={`https://maps.google.com/maps?q=${encodeURIComponent(displayScreen.data)}&t=k&z=14&ie=UTF8&iwloc=&output=embed`} />
-                  )}
-                  {displayScreen.type === 'flight' && (
-                    <iframe title="Flight Radar" width="100%" height="100%" style={{ border: 0 }} src={`https://www.flightradar24.com/simple_index.php?query=${encodeURIComponent(displayScreen.data)}`} />
-                  )}
-                  {displayScreen.type === 'image' && (
-                    <div className="h-full w-full flex items-center justify-center p-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={displayScreen.data} alt="Visual Reference" className="max-w-full max-h-full object-contain rounded-lg border border-[#4B3022]/20" />
-                    </div>
-                  )}
-                  {displayScreen.type === 'code' && (
-                    <textarea 
-                      className="h-full w-full bg-transparent text-[#6F4E37] font-mono text-[13px] leading-relaxed outline-none resize-none p-6 scrollbar-hide"
-                      value={displayScreen.data}
-                      onChange={(e) => setDisplayScreen({ ...displayScreen, data: e.target.value })}
-                      spellCheck={false}
-                    />
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ========================================= */}
-          {/* MAIN CHAT PANEL */}
-          {/* ========================================= */}
-          <motion.div layout className="flex flex-col flex-1 relative z-10 bg-[#050505] overflow-hidden">
-            <div className="p-3 border-b border-[#4B3022]/30 bg-[#050505] flex justify-between items-center relative z-20">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-[#6F4E37] shadow-[0_0_8px_#6F4E37]' : 'bg-red-500 shadow-[0_0_8px_#ef4444]'}`} />
-                <span className="text-[10px] font-bold text-zinc-100 uppercase tracking-widest font-mono">Espresso_Terminal</span>
+    <div className="relative flex h-screen w-full bg-[#050505] text-zinc-300 overflow-hidden font-sans">
+      
+      {/* --- BOOT SCREEN OVERLAY --- */}
+      <AnimatePresence>
+        {isBooting && (
+          <motion.div 
+            className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#050505] text-[#D4AF37] font-mono"
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.6, ease: "easeInOut" }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center"
+            >
+              <EspressoBootAnimation progress={((bootStep + 1) / bootMessages.length) * 100} />
+              <div className="mt-10 h-4 text-[11px] tracking-widest uppercase opacity-80 text-center w-72">
+                {bootMessages[bootStep]}
               </div>
-              
-              <div className="flex items-center gap-4 text-zinc-600">
-                {activeDocument && (
-                   <div className="flex items-center gap-2 px-2 py-1 bg-[#4B3022]/20 rounded-md border border-[#4B3022]/30">
-                     <FileText size={10} className="text-[#6F4E37]" />
-                     <span className="text-[9px] text-[#6F4E37] font-mono uppercase truncate max-w-[100px]">{activeDocument.name}</span>
-                   </div>
-                )}
-                <button onClick={() => { const latest = getLatestAction('code'); setDisplayScreen({ type: 'code', title: 'Workspace', data: latest.data, language: latest.language }); }} className="hover:text-[#6F4E37] transition-colors" title="Recall Latest Code"><Code size={14} /></button>
-                <button onClick={() => { const latest = getLatestAction('map'); setDisplayScreen({ type: 'map', title: 'Global', data: latest.data }); }} className="hover:text-[#6F4E37] transition-colors" title="Recall Latest Map"><MapIcon size={14} /></button>
-                <ShieldCheck size={14} className="opacity-50" />
-              </div>
-            </div>
-
-            <div ref={scrollRef} className="flex-1 p-4 md:p-8 overflow-y-auto scrollbar-hide relative z-10">
-              <div className="max-w-4xl mx-auto space-y-10">
-                {messages.length === 0 && (
-                  <div className="text-[10px] text-zinc-600 mt-4 italic opacity-50 font-mono text-center">Handshake complete. Open Order Book to resume.</div>
-                )}
-                
-                {messages.map((msg, i) => {
-                  let cleanText = msg.content;
-                  let mapMatch = null;
-                  let flightMatch = null;
-                  let codeMatch = null;
-
-                  if (msg.role === 'assistant') {
-                    mapMatch = cleanText.match(/\[MAP:\s*([^\]]+)\]/i);
-                    flightMatch = cleanText.match(/\[FLIGHT:\s*([^\]]+)\]/i);
-                    const codeRegex = new RegExp('`{3}([\\w-]*)\\s*\\n([\\s\\S]*?)`{3}', 'i');
-                    codeMatch = cleanText.match(codeRegex);
-
-                    if (mapMatch) cleanText = cleanText.replace(mapMatch[0], '').trim();
-                    if (flightMatch) cleanText = cleanText.replace(flightMatch[0], '').trim();
-                  }
-
-                  return (
-                    <div key={i} className={`flex flex-col w-full ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                       <div className="flex items-center gap-2 mb-2 pl-1">
-                         {msg.role === 'assistant' && <div className="w-1.5 h-1.5 rounded-full bg-[#6F4E37]" />}
-                         <span className="opacity-40 text-[10px] uppercase font-bold font-mono tracking-widest">
-                           {msg.role === 'user' ? 'Ink' : 'Espresso'}
-                         </span>
-                       </div>
-                       
-                       <div className={`max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'bg-[#0A0A0A] px-5 py-3.5 rounded-2xl border border-[#4B3022]/20' : ''}`}>
-                         {msg.role === 'assistant' ? (
-                           <div className="text-[15px] text-zinc-300">
-                             {cleanText && <TypewriterMarkdown text={cleanText} />}
-                             
-                             <div className="flex flex-wrap gap-2 mt-4">
-                               {mapMatch && (
-                                 <button onClick={() => setDisplayScreen({ type: 'map', title: mapMatch[1], data: mapMatch[1] })} className="flex items-center gap-2 px-4 py-2.5 bg-[#4B3022]/10 border border-[#4B3022]/40 rounded-xl text-[#6F4E37] hover:bg-[#4B3022]/30 transition-all font-mono">
-                                   <MapIcon size={14} />
-                                   <span className="text-[10px] font-bold tracking-wider uppercase">View Map: {mapMatch[1]}</span>
-                                 </button>
-                               )}
-                               {flightMatch && (
-                                 <button onClick={() => setDisplayScreen({ type: 'flight', title: flightMatch[1], data: flightMatch[1] })} className="flex items-center gap-2 px-4 py-2.5 bg-[#4B3022]/10 border border-[#4B3022]/40 rounded-xl text-[#6F4E37] hover:bg-[#4B3022]/30 transition-all font-mono">
-                                   <Plane size={14} />
-                                   <span className="text-[10px] font-bold tracking-wider uppercase">Track: {flightMatch[1]}</span>
-                                 </button>
-                               )}
-                               {codeMatch && (
-                                 <button onClick={() => setDisplayScreen({ type: 'code', title: 'Workspace', language: codeMatch[1], data: codeMatch[2] })} className="flex items-center gap-2 px-4 py-2.5 bg-[#0A0A0A] border border-[#4B3022]/50 rounded-xl text-zinc-300 hover:border-[#6F4E37] hover:text-[#6F4E37] transition-all font-mono">
-                                   <TerminalSquare size={14} />
-                                   <span className="text-[10px] font-bold tracking-wider uppercase">Open in Workspace</span>
-                                 </button>
-                               )}
-                             </div>
-                           </div>
-                         ) : (
-                           <div className="text-[15px] whitespace-pre-wrap leading-relaxed text-zinc-200">
-                             {cleanText}
-                           </div>
-                         )}
-                       </div>
-                    </div>
-                  );
-                })}
-                
-                {isTyping && (
-                  <div className="flex items-center gap-3 pl-1 pt-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#6F4E37] animate-pulse" />
-                    <div className="text-[9px] text-[#6F4E37]/60 animate-pulse italic tracking-widest font-mono">BREWING...</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-4 bg-[#050505]">
-              <form 
-                onSubmit={(e) => { 
-                  e.preventDefault(); 
-                  processCommand(inputText); 
-                  setInputText(''); 
-                  setShowActionMenu(false); 
-                }} 
-                className="flex gap-2 items-center p-2 border border-[#4B3022]/50 bg-[#0A0A0A] rounded-2xl max-w-4xl mx-auto focus-within:border-[#6F4E37]/80 transition-colors relative"
-              >
-                {/* Hidden File Input */}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept="image/*,application/pdf"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
-                    setShowActionMenu(false);
-                  }} 
-                />
-
-                {/* Popover Action Menu */}
-                <div className="relative">
-                  <AnimatePresence>
-                    {showActionMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute bottom-full left-0 mb-4 w-56 bg-[#0A0A0A] border border-[#4B3022]/50 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col"
-                      >
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-3.5 text-sm font-mono text-zinc-300 hover:bg-[#4B3022]/20 hover:text-[#6F4E37] transition-colors text-left">
-                          <Droplet size={16} /> Upload File / Image
-                        </button>
-                        <div className="h-px bg-[#4B3022]/30 w-full" />
-                        <button type="button" onClick={() => { processCommand('/save'); setShowActionMenu(false); }} className="flex items-center gap-3 px-4 py-3.5 text-sm font-mono text-zinc-300 hover:bg-[#4B3022]/20 hover:text-[#6F4E37] transition-colors text-left">
-                          <Package size={16} /> Save Order
-                        </button>
-                        <div className="h-px bg-[#4B3022]/30 w-full" />
-                        <button type="button" onClick={() => { fetchOrderBook(); setIsOrderBookOpen(true); setShowActionMenu(false); }} className="flex items-center gap-3 px-4 py-3.5 text-sm font-mono text-zinc-300 hover:bg-[#4B3022]/20 hover:text-[#6F4E37] transition-colors text-left">
-                          <Coffee size={16} /> Open Order Book
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <button 
-                    type="button" 
-                    onClick={() => setShowActionMenu(!showActionMenu)} 
-                    className={`p-3 transition-colors rounded-xl flex items-center justify-center ${showActionMenu ? 'text-[#6F4E37] bg-[#4B3022]/20' : 'text-zinc-500 hover:text-[#6F4E37]'}`} 
-                  >
-                    <Plus size={20} className={`transition-transform duration-200 ${showActionMenu ? 'rotate-45' : 'rotate-0'}`} />
-                  </button>
-                </div>
-                
-                <input 
-                  className="flex-1 bg-transparent text-white outline-none font-mono text-[14px] px-2" 
-                  placeholder="Command Espresso..." 
-                  value={inputText} 
-                  onChange={(e) => setInputText(e.target.value)} 
-                />
-                <button type="submit" disabled={!inputText.trim()} className="p-3 text-[#6F4E37] hover:text-white disabled:opacity-30 disabled:hover:text-[#6F4E37] transition-colors rounded-xl">
-                  <SendHorizontal size={20} />
-                </button>
-              </form>
-            </div>
+            </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* ========================================= */}
-          {/* THE ORDER BOOK (OVERLAY) */}
-          {/* ========================================= */}
-          <AnimatePresence>
-            {isOrderBookOpen && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className="absolute inset-0 z-50 bg-[#050505]/95 backdrop-blur-md flex flex-col"
-              >
-                {/* Header & Tabs */}
-                <div className="p-6 border-b border-[#4B3022]/30 flex justify-between items-center bg-[#0A0A0A]">
-                  <div className="flex items-center gap-8">
-                    <h2 className="text-xl font-bold text-white font-mono tracking-widest flex items-center gap-3">
-                      <Coffee className="text-[#6F4E37]" /> ORDER BOOK
-                    </h2>
-                    <div className="flex gap-4 font-mono text-sm">
-                      <button 
-                        onClick={() => setOrderTab('order')}
-                        className={`pb-1 transition-colors ${orderTab === 'order' ? 'text-[#6F4E37] border-b-2 border-[#6F4E37]' : 'text-zinc-500 hover:text-zinc-300'}`}
-                      >
-                        ACTIVE ORDERS
-                      </button>
-                      <button 
-                        onClick={() => setOrderTab('archived')}
-                        className={`pb-1 transition-colors ${orderTab === 'archived' ? 'text-[#6F4E37] border-b-2 border-[#6F4E37]' : 'text-zinc-500 hover:text-zinc-300'}`}
-                      >
-                        ARCHIVE
-                      </button>
-                    </div>
-                  </div>
-                  <button onClick={() => setIsOrderBookOpen(false)} className="text-zinc-500 hover:text-white p-2 bg-[#111] rounded-full border border-white/5">
-                    <X size={20} />
-                  </button>
+      {/* --- Main Chat Region --- */}
+      <main className={`flex-1 flex flex-col items-center relative min-w-0 transition-all duration-300 ${mainMarginClass}`}>
+        
+        {/* Premium Header */}
+        <header className="w-full px-6 sm:px-12 py-5 flex justify-between items-center shrink-0 z-10 bg-gradient-to-b from-[#050505] to-transparent">
+          <div className="flex items-center gap-4">
+            <EspressoMark size={32} />
+            <div className="leading-tight">
+              <div className="flex items-center gap-3">
+                <p className="font-serif italic text-xl text-white tracking-wide">espresso</p>
+                {/* Coffee-Themed Network Status Indicator */}
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-900/50 border border-zinc-800">
+                   <div className={`size-1.5 rounded-full ${netColors[netStatus]}`} />
+                   <span className="font-mono text-[8px] uppercase tracking-widest text-zinc-400">{netLabels[netStatus]}</span>
                 </div>
+              </div>
+              <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-500 mt-1">personal assistant</p>
+            </div>
+          </div>
+          <span className="font-mono text-[10px] tracking-[0.25em] text-[#D4AF37] uppercase flex items-center gap-2">
+            <div className={`size-1.5 rounded-full ${status === 'pulling' ? 'bg-[#D4AF37] animate-ping' : status === 'active' ? 'bg-[#D4AF37]' : 'bg-zinc-600'}`} />
+            {headerRight}
+          </span>
+        </header>
 
-                {/* Body - Order Paper Style List */}
-                <div className="flex-1 overflow-y-auto p-8 max-w-5xl mx-auto w-full">
-                  <div className="space-y-4">
-                    {orderBookItems
-                      .filter(item => (orderTab === 'order' ? (item.status !== 'archived') : (item.status === 'archived')))
-                      .map(item => (
-                        <div key={item.id} className="bg-[#0A0A0A] border border-[#4B3022]/30 rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-start md:items-center hover:border-[#6F4E37]/50 transition-colors group">
-                          
-                          {/* Info */}
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-white mb-2 font-sans">{item.title}</h3>
-                            <p className="text-sm text-zinc-500 font-mono line-clamp-2 leading-relaxed">
-                              {item.context || 'No visual context attached to this order.'}
-                            </p>
-                            <div className="flex gap-4 mt-4 text-[10px] font-mono text-zinc-600 uppercase">
-                              <span>ID: {item.id.substring(0, 8)}</span>
-                              <span>•</span>
-                              <span>{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}</span>
-                            </div>
-                          </div>
+        {/* Conversation Area */}
+        <div ref={scrollRef} className="w-full flex-1 overflow-y-auto scrollbar-hide">
+          <div className="mx-auto w-full max-w-3xl px-6 gap-12 pt-10 pb-6 flex flex-col">
+            
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center pt-24 text-center">
+                <EspressoMark size={56} />
+                <h2 className="text-xl font-medium text-white mt-8 mb-2">A fresh pull, ready when you are.</h2>
+                <p className="text-sm text-zinc-500 max-w-md leading-relaxed">
+                  Ask anything. Espresso replies in this stream and keeps nothing across sessions — unless it's worth saving to the Order Book.
+                </p>
+              </div>
+            ) : (
+              messages.map((m, i) => {
+                let cleanText = m.content;
+                let mapMatch = null;
+                let flightMatch = null;
 
-                          {/* Actions */}
-                          <div className="flex items-center gap-3 shrink-0">
-                            <button 
-                              onClick={() => toggleOrderStatus(item.id, item.status || 'order')}
-                              className={`p-3 rounded-xl border transition-all ${item.status === 'archived' ? 'bg-[#4B3022]/20 border-[#4B3022]/50 text-[#6F4E37] hover:bg-transparent' : 'bg-transparent border-zinc-800 text-zinc-500 hover:border-[#6F4E37] hover:text-[#6F4E37]'}`}
-                              title={item.status === 'archived' ? 'Reopen Order' : 'Mark as Finished'}
-                            >
-                              {item.status === 'archived' ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                            </button>
-                            <button 
-                              onClick={() => loadOrderToActive(item)}
-                              className="px-5 py-3 bg-[#4B3022]/10 border border-[#4B3022]/30 text-[#6F4E37] rounded-xl hover:bg-[#4B3022]/20 transition-colors font-mono text-xs font-bold tracking-wider flex items-center gap-2"
-                            >
-                              RESUME <ArrowRight size={14} />
-                            </button>
-                          </div>
-                        </div>
-                    ))}
-                    
-                    {orderBookItems.filter(item => (orderTab === 'order' ? (item.status !== 'archived') : (item.status === 'archived'))).length === 0 && (
-                      <div className="text-center p-12 border border-dashed border-[#4B3022]/30 rounded-3xl text-zinc-600 font-mono">
-                        No {orderTab === 'order' ? 'active orders' : 'archived receipts'} found.
-                      </div>
+                if (m.role === 'assistant') {
+                  mapMatch = cleanText.match(/\[MAP:\s*([^\]]+)\]/i);
+                  flightMatch = cleanText.match(/\[FLIGHT:\s*([^\]]+)\]/i);
+                  if (mapMatch) cleanText = cleanText.replace(mapMatch[0], '').trim();
+                  if (flightMatch) cleanText = cleanText.replace(flightMatch[0], '').trim();
+                }
+
+                return (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    key={i} 
+                    className={`flex flex-col mb-10 w-full ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    {m.role === 'assistant' && (
+                      <p className="text-zinc-500 font-mono text-[10px] mb-2 uppercase tracking-[0.2em] ml-1">Espresso</p>
                     )}
+                    <div className={`text-[15px] leading-relaxed ${m.role === 'user' ? 'bg-[#0A0A0A] border border-zinc-800 text-zinc-200 px-5 py-3 rounded-2xl max-w-[85%] shadow-sm' : 'text-zinc-300 w-full'}`}>
+                       {m.role === 'assistant' ? <TypewriterMarkdown text={cleanText} /> : cleanText}
+                       
+                       {/* Action Buttons: Allow reopening maps if the user closes the panel */}
+                       {(mapMatch || flightMatch) && m.role === 'assistant' && (
+                         <div className="flex flex-wrap gap-2 mt-4">
+                           {mapMatch && (
+                             <button 
+                               onClick={() => {
+                                 setDisplayScreen({ type: 'map', title: mapMatch[1], data: mapMatch[1] });
+                                 setOpenPanel('display');
+                               }} 
+                               className="flex items-center gap-2 px-3 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-lg text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all font-mono shadow-sm"
+                             >
+                               <MapIcon size={14} />
+                               <span className="text-[10px] font-bold tracking-wider uppercase">Open Map: {mapMatch[1]}</span>
+                             </button>
+                           )}
+                           {flightMatch && (
+                             <button 
+                               onClick={() => {
+                                 setDisplayScreen({ type: 'flight', title: flightMatch[1], data: flightMatch[1] });
+                                 setOpenPanel('display');
+                               }} 
+                               className="flex items-center gap-2 px-3 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-lg text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all font-mono shadow-sm"
+                             >
+                               <Plane size={14} />
+                               <span className="text-[10px] font-bold tracking-wider uppercase">Track: {flightMatch[1]}</span>
+                             </button>
+                           )}
+                         </div>
+                       )}
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+
+            {isTyping && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-start mb-8">
+                <p className="text-zinc-500 font-mono text-[10px] mb-2 uppercase tracking-[0.2em] ml-1">Espresso</p>
+                <div className="px-4 py-3 bg-[#0A0A0A] border border-zinc-800 rounded-2xl text-sm text-[#D4AF37] font-mono flex items-center gap-3 shadow-inner">
+                  <div className="flex gap-1">
+                    <div className="size-1.5 bg-[#D4AF37] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="size-1.5 bg-[#D4AF37] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="size-1.5 bg-[#D4AF37] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
+                  Extracting...
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
+          </div>
+        </div>
 
-        </>
-      )}
+        {/* Premium Composer */}
+        <form onSubmit={handleSubmit} className="w-full max-w-3xl px-6 pb-8 pt-4 shrink-0 mx-auto bg-gradient-to-t from-[#050505] via-[#050505] to-transparent">
+          <div className="relative flex items-end gap-2 rounded-2xl border border-zinc-800 bg-[#0A0A0A]/80 backdrop-blur-md px-3 py-2 focus-within:border-[#D4AF37]/60 transition-colors shadow-2xl">
+            
+            <PlusMenu openPanel={openPanel} onPick={(k) => setOpenPanel(openPanel === k ? null : k)} />
+            
+            <textarea
+              ref={taRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+              rows={1}
+              placeholder="What's brewing?"
+              className="flex-1 resize-none bg-transparent py-2 px-1 text-sm text-white placeholder:text-zinc-600 focus:outline-none max-h-40 scrollbar-hide pt-2.5"
+              autoFocus
+            />
+            
+            <button
+              type="submit"
+              disabled={isTyping || !inputText.trim()}
+              className={`size-9 rounded-full grid place-items-center shrink-0 transition-all ${isTyping || !inputText.trim() ? 'bg-zinc-900 text-zinc-600' : 'bg-[#D4AF37] text-black hover:brightness-110 shadow-[0_0_15px_rgba(212,175,55,0.3)]'}`}
+            >
+              <SendHorizontal size={16} />
+            </button>
+          </div>
+          <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-600">
+            no history · order book remembers · ⏎ to send
+          </p>
+        </form>
+      </main>
+
+      {/* Side Panels (Slide Over) */}
+      {Object.entries(PANEL_META).map(([key, meta]) => (
+        <SidePanel 
+          key={key} 
+          open={openPanel === key} 
+          title={meta.title} 
+          subtitle={meta.subtitle} 
+          icon={meta.icon} 
+          isWide={key === 'display'} // Makes display panel explicitly 2/3 width
+          onClose={() => setOpenPanel(null)}
+        >
+          
+          {/* Order Book Content */}
+          {key === 'orderbook' && (
+             <div className="space-y-4">
+               {orderBookItems.length === 0 ? (
+                 <div className="p-12 flex flex-col items-center justify-center text-center border border-dashed border-zinc-800 rounded-2xl">
+                   <BookOpen size={32} className="text-zinc-700 mb-4" />
+                   <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Archive Empty</p>
+                   <p className="text-zinc-600 text-xs mt-2">Use /save in chat to store memories.</p>
+                 </div>
+               ) : (
+                 orderBookItems.map((item, i) => (
+                   <div key={i} className="p-5 bg-[#0A0A0A] border border-zinc-800 rounded-2xl hover:border-[#D4AF37]/40 transition-colors group cursor-pointer">
+                     <h4 className="text-white font-medium mb-2 group-hover:text-[#D4AF37] transition-colors">{item.title}</h4>
+                     <p className="text-zinc-500 text-sm line-clamp-3 leading-relaxed">{item.context}</p>
+                     <div className="mt-4 flex justify-between items-center text-[10px] font-mono text-zinc-600 uppercase">
+                       <span>{item.id.substring(0, 8)}</span>
+                       <span>{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}</span>
+                     </div>
+                   </div>
+                 ))
+               )}
+             </div>
+          )}
+
+          {/* Whiteboard Content */}
+          {key === 'whiteboard' && (
+            <div className="h-full border border-zinc-800 rounded-2xl bg-[#0A0A0A] font-mono text-sm text-zinc-300 shadow-inner overflow-hidden flex flex-col">
+              <div className="p-3 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center text-xs text-zinc-500 uppercase tracking-widest">
+                 <div className="flex items-center gap-2">
+                   <Code size={14} className="text-[#D4AF37]" /> 
+                   <span>{latestCode ? `workspace.${latestCode.language || 'txt'}` : 'WORKSPACE_EMPTY'}</span>
+                 </div>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1">
+                {latestCode ? (
+                  <pre className="text-[#D4AF37] text-xs leading-relaxed"><code>{latestCode.code}</code></pre>
+                ) : (
+                  <>
+                    <span className="text-zinc-600">{'//'} Ready for notes and code</span><br/><br/>
+                    <span className="text-[#D4AF37]">const</span> workspace = <span className="text-blue-400">ready</span>;<br/>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Display Content (Maps/Images) */}
+          {key === 'display' && (
+            displayScreen ? (
+              <div className="h-full w-full rounded-2xl overflow-hidden border border-zinc-800 bg-black shadow-inner">
+                {displayScreen.type === 'map' && (
+                  <iframe
+                    title="Map View"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(100%) grayscale(20%)' }} // Night mode map trick
+                    loading="lazy"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(displayScreen.data)}&t=k&z=14&ie=UTF8&iwloc=&output=embed`}
+                  />
+                )}
+                {displayScreen.type === 'flight' && (
+                   <iframe title="Flight Radar" width="100%" height="100%" style={{ border: 0 }} src={`https://www.flightradar24.com/simple_index.php?query=${encodeURIComponent(displayScreen.data)}`} />
+                )}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl p-8 text-center bg-[#0A0A0A]">
+                <CupSoda size={48} className="text-zinc-800 mb-6" />
+                <h3 className="text-zinc-300 font-medium text-lg mb-2">No active visual plated</h3>
+                <p className="text-zinc-600 text-sm max-w-[200px]">Ask Espresso to generate a map or track a flight to populate this view.</p>
+              </div>
+            )
+          )}
+          
+        </SidePanel>
+      ))}
+
     </div>
   );
 }
