@@ -153,6 +153,8 @@ function useEspressoAI() {
   const [displayScreen, setDisplayScreen] = useState<any>(null);
   const [orderBookItems, setOrderBookItems] = useState<any[]>([]);
 
+  const [workspaceContent, setWorkspaceContent] = useState<string>('');
+
   const netStatus = useNetworkStatus(user);
 
   useEffect(() => {
@@ -198,6 +200,43 @@ function useEspressoAI() {
       return;
     }
 
+    if (text.startsWith('/recall')) {
+      const query = text.replace('/recall', '').trim();
+      
+      if (!query) {
+        // Way 2: List available projects
+        const activeOrders = orderBookItems.filter(o => o.status !== 'archived').map(o => `- **${o.title}**`).join('\n');
+        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Available Orders to recall:\n${activeOrders || "No active orders found."}\n\n*Use /recall [name] to load one.*` }]);
+      } else {
+        // Way 3: Recall specific project
+        const target = orderBookItems.find(o => o.title.toLowerCase() === query.toLowerCase());
+        if (target) {
+          setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM] Recalled: ${target.title}**\n\n*Context:* ${target.context}` }]);
+          // You can also push the context into the AI's hidden memory here
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Could not find order: '${query}'.` }]);
+        }
+      }
+      return;
+    }
+
+    const deleteOrder = async (id: string) => {
+      if (!db) return;
+      // Firestore delete logic
+      // await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', id));
+      fetchOrderBook(); // Refresh UI
+    };
+
+    const archiveOrder = async (id: string, title: string, context: string) => {
+      if (!db) return;
+      // 1. Update doc status to 'archived'
+      // await updateDoc(doc(...), { status: 'archived' });
+      
+      // 2. Push to Hard Skill to ensure Espresso remembers it permanently
+      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Archiving '${title}'. Updating Hard Skills matrix... \n[UPDATE_SKILL:hard:Archived Project: ${title} - ${context}]` }]);
+      fetchOrderBook();
+    };
+
     setStatus('pulling');
     setIsTyping(true);
     try {
@@ -233,7 +272,9 @@ function useEspressoAI() {
     }
   };
 
-  return { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, processCommand, fetchOrderBook, orderBookItems };
+  return { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, 
+    processCommand, fetchOrderBook, orderBookItems, 
+    workspaceContent, setWorkspaceContent };
 }
 
 // --- NETWORK STATUS DOT ---
@@ -378,7 +419,11 @@ export default function App() {
   const [isBooting, setIsBooting] = useState(true);
   const [bootStep, setBootStep] = useState(0);
 
-  const { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, processCommand, fetchOrderBook, orderBookItems } = useEspressoAI();
+  const { 
+    messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, 
+    processCommand, fetchOrderBook, orderBookItems, 
+    workspaceContent, setWorkspaceContent 
+  } = useEspressoAI();
 
   const bootMessages = [
     "GRINDING BEANS...",
@@ -441,7 +486,11 @@ export default function App() {
   const latestCode = getLatestCode();
 
   // Dynamic layout constraint. Uses fraction `md:mr-2/3` to perfectly align with SidePanel.
-  const mainMarginClass = openPanel === 'display' ? 'md:mr-2/3' : openPanel ? 'md:mr-[400px] lg:mr-[450px]' : 'mr-0';
+  const mainLayoutClass = openPanel === 'display' 
+  ? 'md:w-1/3 flex-none' 
+  : openPanel 
+    ? 'flex-1 md:mr-[400px] lg:mr-[450px]' 
+    : 'flex-1 mr-0';
 
   return (
     <div className="relative flex h-screen w-full bg-[#050505] text-zinc-300 overflow-hidden font-sans">
@@ -470,7 +519,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* --- Main Chat Region --- */}
-      <main className={`flex-1 flex flex-col items-center relative min-w-0 transition-all duration-300 ${mainMarginClass}`}>
+      <main className={`flex-1 flex flex-col items-center relative min-w-0 transition-all duration-300 ${mainLayoutClass}`}>
         
         {/* Premium Header */}
         <header className="w-full px-6 sm:px-12 py-5 flex justify-between items-center shrink-0 z-10 bg-gradient-to-b from-[#050505] to-transparent">
@@ -618,47 +667,68 @@ export default function App() {
           
           {/* Order Book Content */}
           {key === 'orderbook' && (
-             <div className="space-y-4">
-               {orderBookItems.length === 0 ? (
-                 <div className="p-12 flex flex-col items-center justify-center text-center border border-dashed border-zinc-800 rounded-2xl">
-                   <BookOpen size={32} className="text-zinc-700 mb-4" />
-                   <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Archive Empty</p>
-                   <p className="text-zinc-600 text-xs mt-2">Use /save in chat to store memories.</p>
-                 </div>
-               ) : (
-                 orderBookItems.map((item, i) => (
-                   <div key={i} className="p-5 bg-[#0A0A0A] border border-zinc-800 rounded-2xl hover:border-[#D4AF37]/40 transition-colors group cursor-pointer">
-                     <h4 className="text-white font-medium mb-2 group-hover:text-[#D4AF37] transition-colors">{item.title}</h4>
-                     <p className="text-zinc-500 text-sm line-clamp-3 leading-relaxed">{item.context}</p>
-                     <div className="mt-4 flex justify-between items-center text-[10px] font-mono text-zinc-600 uppercase">
-                       <span>{item.id.substring(0, 8)}</span>
-                       <span>{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}</span>
-                     </div>
-                   </div>
-                 ))
-               )}
-             </div>
+            <div className="space-y-4">
+              {orderBookItems.length === 0 ? (
+                <div className="p-12 flex flex-col items-center justify-center text-center border border-dashed border-zinc-800 rounded-2xl">
+                  <BookOpen size={32} className="text-zinc-700 mb-4" />
+                  <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Archive Empty</p>
+                  <p className="text-zinc-600 text-xs mt-2">Use /save in chat to store memories.</p>
+                </div>
+              ) : (
+                orderBookItems.map((item, i) => (
+                  <div key={i} className="p-5 bg-[#0A0A0A] border border-zinc-800 rounded-2xl hover:border-[#D4AF37]/40 transition-colors group">
+                    <h4 className="text-white font-medium mb-1">{item.title}</h4>
+                    {/* Recall Button triggers summary directly in UI */}
+                    <p className="text-zinc-500 text-xs line-clamp-2 mb-4 leading-relaxed">{item.context}</p>
+                    
+                    <div className="flex gap-2 mb-3 border-t border-zinc-800/50 pt-3">
+                      <button 
+                          onClick={() => processCommand(`/recall ${item.title}`, setOpenPanel)} 
+                          className="text-[10px] uppercase tracking-wider font-mono bg-zinc-900 text-[#D4AF37] px-2 py-1 rounded hover:bg-zinc-800"
+                      >
+                          Recall
+                      </button>
+                      <button 
+                          onClick={() => archiveOrder(item.id, item.title, item.context)} 
+                          className="text-[10px] uppercase tracking-wider font-mono bg-zinc-900 text-blue-400 px-2 py-1 rounded hover:bg-zinc-800"
+                      >
+                          Archive
+                      </button>
+                      <button 
+                          onClick={() => deleteOrder(item.id)} 
+                          className="text-[10px] uppercase tracking-wider font-mono bg-zinc-900 text-red-500 px-2 py-1 rounded hover:bg-zinc-800 ml-auto"
+                      >
+                          Delete
+                      </button>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-[9px] font-mono text-zinc-600 uppercase">
+                      <span>{item.id?.substring(0, 8)}</span>
+                      <span>{item.status === 'archived' ? 'ARCHIVED' : 'ACTIVE'}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           )}
 
           {/* Whiteboard Content */}
+          {/* Whiteboard Content */}
           {key === 'whiteboard' && (
-            <div className="h-full border border-zinc-800 rounded-2xl bg-[#0A0A0A] font-mono text-sm text-zinc-300 shadow-inner overflow-hidden flex flex-col">
+            <div className="h-full border border-zinc-800 rounded-2xl bg-[#0A0A0A] font-mono text-sm shadow-inner overflow-hidden flex flex-col">
               <div className="p-3 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center text-xs text-zinc-500 uppercase tracking-widest">
-                 <div className="flex items-center gap-2">
-                   <Code size={14} className="text-[#D4AF37]" /> 
-                   <span>{latestCode ? `workspace.${latestCode.language || 'txt'}` : 'WORKSPACE_EMPTY'}</span>
-                 </div>
+                <div className="flex items-center gap-2">
+                  <Code size={14} className="text-[#D4AF37]" /> 
+                  <span>workspace.txt</span>
+                </div>
               </div>
-              <div className="p-6 overflow-y-auto flex-1">
-                {latestCode ? (
-                  <pre className="text-[#D4AF37] text-xs leading-relaxed"><code>{latestCode.code}</code></pre>
-                ) : (
-                  <>
-                    <span className="text-zinc-600">{'//'} Ready for notes and code</span><br/><br/>
-                    <span className="text-[#D4AF37]">const</span> workspace = <span className="text-blue-400">ready</span>;<br/>
-                  </>
-                )}
-              </div>
+              <textarea
+                className="flex-1 w-full bg-transparent p-6 text-[#A6E22E] outline-none resize-none font-mono text-xs leading-relaxed"
+                value={workspaceContent}
+                onChange={(e) => setWorkspaceContent(e.target.value)}
+                placeholder="// Ready for notes and code. Type here, Espresso is watching."
+                spellCheck={false}
+              />
             </div>
           )}
 
@@ -667,18 +737,24 @@ export default function App() {
             displayScreen ? (
               <div className="h-full w-full rounded-2xl overflow-hidden border border-zinc-800 bg-black shadow-inner">
                 {displayScreen.type === 'map' && (
-                  <iframe
-                    title="Map View"
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(100%) grayscale(20%)' }} // Night mode map trick
-                    loading="lazy"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(displayScreen.data)}&t=k&z=14&ie=UTF8&iwloc=&output=embed`}
-                  />
-                )}
+                    <iframe
+                      title="Map View"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(100%) grayscale(20%)' }} // Night mode map trick
+                      loading="lazy"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(displayScreen.data)}&t=k&z=14&ie=UTF8&iwloc=&output=embed`}
+                    />
+                  )}
                 {displayScreen.type === 'flight' && (
-                   <iframe title="Flight Radar" width="100%" height="100%" style={{ border: 0 }} src={`https://www.flightradar24.com/simple_index.php?query=${encodeURIComponent(displayScreen.data)}`} />
-                )}
+                <iframe 
+                  title="Flight Tracker" 
+                  width="100%" 
+                  height="100%" 
+                  style={{ border: 0 }} 
+                  src={`https://flightaware.com/live/flight/${encodeURIComponent(displayScreen.data)}`} 
+                />
+              )}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl p-8 text-center bg-[#0A0A0A]">

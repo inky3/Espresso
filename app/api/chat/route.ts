@@ -21,6 +21,8 @@ async function updateCloudMemory(type: 'hard' | 'soft', newContent: string) {
   } catch (e) { console.error("Memory Update Failed:", e); }
 }
 
+
+
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
@@ -32,7 +34,15 @@ export async function POST(req: Request) {
     ]);
 
     // Construct the context
-    const systemInstruction = `You are Espresso. Context Memory:\nHard Skills: ${hardSkills}\nSoft Skills: ${softSkills}\n\nProtocol: If you output [UPDATE_SKILL:(hard|soft):(content)], the system will persist it.`;
+    // Construct the context
+    const systemInstruction = `You are Espresso. Context Memory:
+      Hard Skills: ${hardSkills}
+      Soft Skills: ${softSkills}
+
+      System Protocols: 
+      1. Memory Update: If you output [UPDATE_SKILL:(hard|soft):(content)], the system will persist it.
+      2. Maps: If the user asks to see a location, find a place, or show a map, you MUST output exactly [MAP: Location Name] somewhere in your response. 
+      3. Flights: If the user asks to track a flight, output exactly [FLIGHT: Flight Number] somewhere in your response.`;
 
     // Call API
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -59,3 +69,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ text: "Error: Connection failed." }, { status: 500 });
   }
 }
+
+const [workspaceContent, setWorkspaceContent] = useState<string>('');
+
+// Inside processCommand, update the fetch call to include the workspace:
+const res = await fetch('/api/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ 
+    messages: [...messages, userMsg], 
+    activeDocument,
+    workspace: workspaceContent // Espresso can now read the whiteboard!
+  }) 
+});
