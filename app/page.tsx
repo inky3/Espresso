@@ -90,7 +90,7 @@ function TypewriterMarkdown({ text }: { text: string }) {
         ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 marker:text-[#D4AF37]" {...props} />,
         code: ({node, inline, ...props}: any) => inline 
           ? <code className="bg-[#D4AF37]/10 text-[#D4AF37] px-1.5 py-0.5 rounded-md text-[13px] font-mono border border-[#D4AF37]/20" {...props} />
-          : <code className="block bg-[#0A0A0A] border border-zinc-800 p-4 rounded-xl text-[13px] font-mono overflow-x-auto mb-4 mt-2 text-zinc-300 shadow-inner" {...props} />,
+          : <code className="block bg-[#0A0A0A] border border-zinc-800 p-4 rounded-xl text-[13px] font-mono mb-4 mt-2 text-zinc-300 shadow-inner whitespace-pre-wrap break-words" {...props} />,
       }}
     >
       {displayedText}
@@ -152,7 +152,6 @@ function useEspressoAI() {
   const [activeDocument, setActiveDocument] = useState<{ name: string, text: string } | null>(null);
   const [displayScreen, setDisplayScreen] = useState<any>(null);
   const [orderBookItems, setOrderBookItems] = useState<any[]>([]);
-
   const [workspaceContent, setWorkspaceContent] = useState<string>('');
 
   const netStatus = useNetworkStatus(user);
@@ -177,16 +176,26 @@ function useEspressoAI() {
     } catch (err) {}
   };
 
+  // Moved OUTSIDE processCommand so your UI buttons can actually use them!
+  const deleteOrder = async (id: string) => {
+    if (!db) return;
+    // await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', id));
+    fetchOrderBook(); 
+  };
+
+  const archiveOrder = async (id: string, title: string, context: string) => {
+    if (!db) return;
+    setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Archiving '${title}'. Updating Hard Skills matrix... \n[UPDATE_SKILL:hard:Archived Project: ${title} - ${context}]` }]);
+    fetchOrderBook();
+  };
+
   const processCommand = async (text: string, openPanelFn: (k: PanelKey) => void) => {
     if (!text.trim()) return;
     const userMsg = { role: 'user', content: text, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     
     if (text === '/seed' && user && db) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Injecting Matrix into L2 Cloud Memory...` }]);
-      await setDoc(doc(db, 'artifacts', appId, 'memory', 'hard'), { content: "System Matrix Core active." });
-      await setDoc(doc(db, 'artifacts', appId, 'memory', 'soft'), { content: "System Matrix Core active." });
-      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Success. Matrix injected.` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Injecting Matrix...` }]);
       return;
     }
 
@@ -200,42 +209,28 @@ function useEspressoAI() {
       return;
     }
 
+    // --- IMPROVED RECALL LOGIC ---
     if (text.startsWith('/recall')) {
       const query = text.replace('/recall', '').trim();
       
       if (!query) {
-        // Way 2: List available projects
+        // Just listing projects. Stop here, no AI needed.
         const activeOrders = orderBookItems.filter(o => o.status !== 'archived').map(o => `- **${o.title}**`).join('\n');
-        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Available Orders to recall:\n${activeOrders || "No active orders found."}\n\n*Use /recall [name] to load one.*` }]);
-      } else {
-        // Way 3: Recall specific project
-        const target = orderBookItems.find(o => o.title.toLowerCase() === query.toLowerCase());
-        if (target) {
-          setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM] Recalled: ${target.title}**\n\n*Context:* ${target.context}` }]);
-          // You can also push the context into the AI's hidden memory here
-        } else {
-          setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Could not find order: '${query}'.` }]);
-        }
+        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Available Orders:\n${activeOrders || "No active orders found."}\n\n*Use /recall [name] to load one.*` }]);
+        return; // Fixed: Stops the "Extracting..." hang!
       }
-      return;
-    }
 
-    const deleteOrder = async (id: string) => {
-      if (!db) return;
-      // Firestore delete logic
-      // await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', id));
-      fetchOrderBook(); // Refresh UI
-    };
-
-    const archiveOrder = async (id: string, title: string, context: string) => {
-      if (!db) return;
-      // 1. Update doc status to 'archived'
-      // await updateDoc(doc(...), { status: 'archived' });
+      const target = orderBookItems.find(o => o.title.toLowerCase() === query.toLowerCase());
       
-      // 2. Push to Hard Skill to ensure Espresso remembers it permanently
-      setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Archiving '${title}'. Updating Hard Skills matrix... \n[UPDATE_SKILL:hard:Archived Project: ${title} - ${context}]` }]);
-      fetchOrderBook();
-    };
+      if (target) {
+        // SUCCESS: We silently inject the context into your message, and let it fall through to the AI so she actually talks to you!
+        userMsg.content = `[SYSTEM EVENT: The user recalled the project "${target.title}". Memory context: ${target.context}. Acknowledge this conversationally and ask what they want to do next.]`;
+      } else {
+        // FAIL: Order not found. Stop here, no AI needed.
+        setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Could not find order: '${query}'.` }]);
+        return; // Fixed: Stops the "Extracting..." hang!
+      }
+    }
 
     setStatus('pulling');
     setIsTyping(true);
@@ -243,14 +238,13 @@ function useEspressoAI() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMsg], activeDocument }) 
+        body: JSON.stringify({ messages: [...messages, userMsg], activeDocument, workspace: workspaceContent }) 
       });
       const data = await res.json();
       const replyText = data.text;
       
       setMessages(prev => [...prev, { role: 'assistant', content: replyText, timestamp: Date.now() }]);
       
-      // Auto-open panels based on tags
       const mapMatch = replyText.match(/\[MAP:\s*([^\]]+)\]/i);
       const flightMatch = replyText.match(/\[FLIGHT:\s*([^\]]+)\]/i);
       
@@ -272,9 +266,12 @@ function useEspressoAI() {
     }
   };
 
-  return { messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, 
+  return { 
+    messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, 
     processCommand, fetchOrderBook, orderBookItems, 
-    workspaceContent, setWorkspaceContent };
+    workspaceContent, setWorkspaceContent,
+    deleteOrder, archiveOrder // Exporting the newly moved functions
+  };
 }
 
 // --- NETWORK STATUS DOT ---
@@ -325,8 +322,14 @@ function NetworkStatusDot({ netStatus, netColors, netLabels }: { netStatus: stri
 
 // --- COMPONENTS ---
 function SidePanel({ open, title, subtitle, icon: Icon, onClose, isWide, children }: any) {
-  // Dynamically expands to EXACTLY 2/3 of the screen for Maps/Displays using Tailwind fractions
+  // Desktop widths: 2/3 for map, fixed pixels for others
   const widthClass = isWide ? 'md:w-2/3' : 'md:w-[400px] lg:w-[450px]';
+  
+  // Mobile heights: Top 50vh for Maps. Full screen for Whiteboard/Orders.
+  // Desktop heights: Always full height (md:bottom-0 md:h-auto).
+  const heightClass = isWide 
+    ? 'h-[50vh] md:h-auto md:bottom-0 border-b border-zinc-800 md:border-b-0' 
+    : 'bottom-0';
 
   return (
     <AnimatePresence>
@@ -336,7 +339,8 @@ function SidePanel({ open, title, subtitle, icon: Icon, onClose, isWide, childre
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className={`absolute right-0 top-0 bottom-0 w-full ${widthClass} bg-[#050505] border-l border-zinc-800 shadow-2xl z-40 flex flex-col`}
+          // Added heightClass and removed the hardcoded bottom-0
+          className={`absolute right-0 top-0 w-full ${widthClass} ${heightClass} bg-[#050505] border-l border-zinc-800 shadow-2xl z-40 flex flex-col`}
         >
           <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between bg-[#0A0A0A]">
             <div className="flex items-center gap-4">
@@ -361,9 +365,27 @@ function SidePanel({ open, title, subtitle, icon: Icon, onClose, isWide, childre
 
 function PlusMenu({ openPanel, onPick }: { openPanel: PanelKey, onPick: (k: PanelKey) => void }) {
   const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside of it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
   
   return (
-    <div className="relative">
+    // Added ref={menuRef} to the wrapper div
+    <div className="relative" ref={menuRef}>
       <button 
         type="button" 
         onClick={() => setIsOpen(!isOpen)} 
@@ -422,7 +444,8 @@ export default function App() {
   const { 
     messages, isTyping, status, netStatus, displayScreen, setDisplayScreen, 
     processCommand, fetchOrderBook, orderBookItems, 
-    workspaceContent, setWorkspaceContent 
+    workspaceContent, setWorkspaceContent,
+    deleteOrder, archiveOrder // Make sure to add these two right here!
   } = useEspressoAI();
 
   const bootMessages = [
@@ -487,13 +510,13 @@ export default function App() {
 
   // Dynamic layout constraint. Uses fraction `md:mr-2/3` to perfectly align with SidePanel.
   const mainLayoutClass = openPanel === 'display' 
-  ? 'md:w-1/3 flex-none' 
+  ? 'pt-[50vh] md:pt-0 md:w-1/3 flex-none' 
   : openPanel 
     ? 'flex-1 md:mr-[400px] lg:mr-[450px]' 
     : 'flex-1 mr-0';
 
   return (
-    <div className="relative flex h-screen w-full bg-[#050505] text-zinc-300 overflow-hidden font-sans">
+    <div className="fixed inset-0 flex w-full bg-[#050505] text-zinc-300 overflow-hidden font-sans">
       
       {/* --- BOOT SCREEN OVERLAY --- */}
       <AnimatePresence>
@@ -635,7 +658,8 @@ export default function App() {
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
               rows={1}
               placeholder="What's brewing?"
-              className="flex-1 resize-none bg-transparent py-2 px-1 text-sm text-white placeholder:text-zinc-600 focus:outline-none max-h-40 scrollbar-hide pt-2.5"
+              /* Changed text-sm to text-base, adjusted padding, added min-h-[36px] */
+              className="flex-1 resize-none bg-transparent py-1.5 px-2 text-base text-white placeholder:text-zinc-600 focus:outline-none max-h-40 scrollbar-hide min-h-[36px]"
               autoFocus
             />
             
@@ -722,13 +746,15 @@ export default function App() {
                   <span>workspace.txt</span>
                 </div>
               </div>
+              
               <textarea
-                className="flex-1 w-full bg-transparent p-6 text-[#A6E22E] outline-none resize-none font-mono text-xs leading-relaxed"
+                className="flex-1 w-full bg-transparent p-6 text-blue-300 outline-none resize-none font-mono text-xs leading-relaxed whitespace-pre-wrap break-words"
                 value={workspaceContent}
                 onChange={(e) => setWorkspaceContent(e.target.value)}
                 placeholder="// Ready for notes and code. Type here, Espresso is watching."
                 spellCheck={false}
               />
+              
             </div>
           )}
 
@@ -743,18 +769,19 @@ export default function App() {
                       height="100%"
                       style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(100%) grayscale(20%)' }} // Night mode map trick
                       loading="lazy"
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(displayScreen.data)}&t=k&z=14&ie=UTF8&iwloc=&output=embed`}
+                      src={`http://googleusercontent.com/maps.google.com/${encodeURIComponent(displayScreen.data)}&t=k&z=14&ie=UTF8&iwloc=&output=embed`}
                     />
                   )}
                 {displayScreen.type === 'flight' && (
-                <iframe 
-                  title="Flight Tracker" 
-                  width="100%" 
-                  height="100%" 
-                  style={{ border: 0 }} 
-                  src={`https://flightaware.com/live/flight/${encodeURIComponent(displayScreen.data)}`} 
-                />
-              )}
+                  <iframe 
+                    title="Flight Tracker" 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    // Swapped to ADS-B Exchange which allows iframe embeds natively
+                    src={`https://globe.adsbexchange.com/?ident=${encodeURIComponent(displayScreen.data)}`} 
+                  />
+                )}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl p-8 text-center bg-[#0A0A0A]">
