@@ -354,7 +354,7 @@ function useEspressoAI() {
       // Build messages array — for images, send base64 directly as Anthropic vision content
       const apiMessages = [...messages, userMsg].map(m => {
         if (attachedFile?.text.startsWith('[IMAGE_BASE64:') && m === userMsg) {
-          const match = attachedFile.text.match(/^\[IMAGE_BASE64:(.*?)\]:(.*)/s);
+          const match = attachedFile.text.match(/^\[IMAGE_BASE64:([\s\S]*?)\]:([\s\S]*)/);
           if (match) {
             return {
               role: m.role,
