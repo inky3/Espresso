@@ -205,16 +205,19 @@ function useEspressoAI() {
 
   const netStatus = useNetworkStatus(user);
 
-  // Persist messages to sessionStorage whenever they change (Feature #7)
-  useEffect(() => { if (sessionHydrated) saveSessionMessages(messages); }, [messages, sessionHydrated]);
-  // Feature #7: Hydrate session after mount (client-only, avoids SSR mismatch)
+  // Feature #7: Session cache — declared first so both effects can reference it
   const [sessionHydrated, setSessionHydrated] = useState(false);
+
+  // Hydrate from sessionStorage after mount (client-only, avoids SSR mismatch)
   useEffect(() => {
     if (sessionHydrated) return;
     const saved = loadSessionMessages();
     if (saved.length > 0) setMessages(saved);
     setSessionHydrated(true);
   }, []);
+
+  // Persist messages to sessionStorage whenever they change
+  useEffect(() => { if (sessionHydrated) saveSessionMessages(messages); }, [messages, sessionHydrated]);
 
   useEffect(() => {
     if (!auth) return;
