@@ -129,6 +129,19 @@ function TypewriterMarkdown({ text }: { text: string }) {
         em:     ({node, ...props}) => <em className="italic text-zinc-400" {...props} />,
         ul:     ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 marker:text-[#D4AF37]" {...props} />,
         ol:     ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 marker:text-[#D4AF37]" {...props} />,
+        img:    ({node, src, alt, ...props}) => (
+          <span className="block my-3">
+            <img
+              src={src}
+              alt={alt || ''}
+              className="rounded-xl max-w-full max-h-[320px] object-cover border border-zinc-800 shadow-md"
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              {...props}
+            />
+            {alt && <span className="block text-[11px] text-zinc-500 mt-1.5 font-mono">{alt}</span>}
+          </span>
+        ),
         code:   ({node, inline, children, ...props}: any) => {
           const codeText = String(children).replace(/\n$/, '');
           if (inline) {
@@ -554,20 +567,40 @@ function PlusMenu({ openPanel, onPick }: { openPanel: PanelKey; onPick: (k: Pane
 }
 
 // ─── PINNED FILE CAPSULE (Feature #13) ───────────────────────────────────────
-function PinnedFileCapsule({ file, onRemove }: { file: { name: string }; onRemove: () => void }) {
+function PinnedFileCapsule({ file, onRemove }: { file: { name: string; previewUrl?: string }; onRemove: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 4, scale: 0.95 }}
       transition={{ duration: 0.15 }}
-      className="flex items-center gap-2 px-3 py-1.5 bg-[#0A0A0A] border border-[#D4AF37]/30 rounded-full text-[11px] font-mono text-[#D4AF37] shadow-sm"
+      className="flex items-center gap-2"
     >
-      <Paperclip size={11} />
-      <span className="max-w-[160px] truncate">{file.name}</span>
-      <button onClick={onRemove} className="ml-0.5 text-zinc-500 hover:text-white transition-colors">
-        <X size={11} />
-      </button>
+      {file.previewUrl ? (
+        // Image preview — thumbnail like Gemini
+        <div className="relative group">
+          <img
+            src={file.previewUrl}
+            alt={file.name}
+            className="h-16 w-24 object-cover rounded-xl border border-[#D4AF37]/25 shadow-md"
+          />
+          <button
+            onClick={onRemove}
+            className="absolute -top-1.5 -right-1.5 size-4 bg-zinc-900 border border-zinc-700 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+          >
+            <X size={9} />
+          </button>
+        </div>
+      ) : (
+        // File pill for non-image
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0A0A0A] border border-[#D4AF37]/30 rounded-full text-[11px] font-mono text-[#D4AF37] shadow-sm">
+          <Paperclip size={11} />
+          <span className="max-w-[160px] truncate">{file.name}</span>
+          <button onClick={onRemove} className="ml-0.5 text-zinc-500 hover:text-white transition-colors">
+            <X size={11} />
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -618,17 +651,35 @@ function SlashMenu({ query, onSelect }: { query: string; onSelect: (cmd: string)
   );
 }
 
+// ─── GRAIN OVERLAY ───────────────────────────────────────────────────────────
+function GrainOverlay() {
+  return (
+    <div
+      className="fixed inset-0 z-[1] pointer-events-none opacity-[0.035]"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")`,
+        backgroundSize: '160px',
+      }}
+    />
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [openPanel, setOpenPanel] = useState<PanelKey>(null);
   const [inputText, setInputText]  = useState('');
-  const [isDragging, setIsDragging] = useState(false);                   // Feature #12
-  const [pendingFile, setPendingFile] = useState<{ name: string; text: string } | null>(null); // Feature #11-13
-  const [showSlash, setShowSlash]   = useState(false);                    // Feature #4
+  const [isDragging, setIsDragging] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{ name: string; text: string; previewUrl?: string } | null>(null);
+  const [showSlash, setShowSlash]   = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const taRef        = useRef<HTMLTextAreaElement>(null);
   const scrollRef    = useRef<HTMLDivElement>(null);
   const composerRef  = useRef<HTMLDivElement>(null);
+  // Mobile detection — Enter = newline on mobile, submit on desktop
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768);
+  }, []);
 
   const [isBooting, setIsBooting] = useState(true);
   const [bootStep, setBootStep]   = useState(0);
@@ -649,6 +700,18 @@ export default function App() {
     "EXTRACTING WORKSPACE...",
     "PULL COMPLETE. SYSTEM ONLINE.",
   ];
+
+  // Aurora keyframe injection
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,30px) scale(1.1); } }
+      @keyframes drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-30px,20px) scale(0.95); } }
+      @keyframes drift3 { from { transform: translate(0,0) scale(1); } to { transform: translate(20px,-20px) scale(1.05); } }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
 
   useEffect(() => {
     let stepIndex = 0;
@@ -761,8 +824,16 @@ export default function App() {
       : 'flex-1 mr-0';
 
   return (
-    <div className="fixed inset-0 flex w-full bg-[#050505] text-zinc-300 overflow-hidden font-sans">
+    <div className="fixed inset-0 flex w-full bg-[#0a0a0a] text-zinc-300 overflow-hidden font-sans">
 
+      {/* ── AURORA BACKGROUND ─────────────────────────────────────────── */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute w-[500px] h-[500px] rounded-full opacity-[0.13] blur-[100px] bg-amber-700 -top-32 -left-20 animate-[drift1_14s_ease-in-out_infinite_alternate]" />
+        <div className="absolute w-[400px] h-[400px] rounded-full opacity-[0.09] blur-[90px] bg-amber-900 top-20 -right-24 animate-[drift2_17s_ease-in-out_infinite_alternate]" />
+        <div className="absolute w-[600px] h-[280px] rounded-full opacity-[0.14] blur-[110px] bg-orange-950 -bottom-16 left-[10%] animate-[drift3_20s_ease-in-out_infinite_alternate]" />
+      </div>
+      {/* grain overlay */}
+      <GrainOverlay />
       {/* ── BOOT SCREEN ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {isBooting && (
@@ -802,11 +873,11 @@ export default function App() {
       <main className={`flex-1 flex flex-col items-center relative min-w-0 transition-all duration-300 ${mainLayoutClass}`}>
 
         {/* Header */}
-        <header className="w-full px-6 sm:px-12 py-5 flex justify-between items-center shrink-0 z-10 bg-gradient-to-b from-[#050505] to-transparent">
-          <div className="flex items-center gap-4">
-            <EspressoMark size={32} />
-            <div className="flex items-center gap-3">
-              <p className="font-serif italic text-xl text-white tracking-wide">espresso</p>
+        <header className="w-full px-6 sm:px-10 py-4 flex justify-between items-center shrink-0 z-10">
+          <div className="flex items-center gap-3">
+            <EspressoMark size={28} />
+            <div className="flex items-center gap-2.5">
+              <p className="text-sm font-medium text-white/90 tracking-[0.05em] lowercase">espresso</p>
               <NetworkStatusDot netStatus={netStatus} netColors={netColors} netLabels={netLabels} />
             </div>
           </div>
@@ -814,9 +885,9 @@ export default function App() {
           <button
             onClick={clearSession}
             title="New Chat (clear session)"
-            className="p-2 text-zinc-500 hover:text-[#D4AF37] hover:bg-zinc-900 rounded-xl transition-colors"
+            className="size-[30px] grid place-items-center text-white/25 hover:text-white/60 hover:bg-white/5 rounded-lg transition-colors"
           >
-            <PenSquare size={18} />
+            <PenSquare size={14} />
           </button>
         </header>
 
@@ -825,12 +896,33 @@ export default function App() {
           <div className="mx-auto w-full max-w-3xl px-6 gap-12 pt-10 pb-6 flex flex-col">
 
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center pt-24 text-center">
-                <EspressoMark size={56} />
-                <h2 className="text-xl font-medium text-white mt-8 mb-2">A fresh pull, ready when you are.</h2>
-                <p className="text-sm text-zinc-500 max-w-md leading-relaxed">
-                  Ask anything. Espresso replies in this stream and keeps nothing across sessions — unless it's worth saving to the Order Book.
+              <div className="flex flex-col items-start justify-center pt-16 pb-8 px-2 min-h-[60vh]">
+                {/* eyebrow */}
+                <p className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.22em] text-[#D4AF37]/60 mb-4">
+                  <span className="inline-block w-5 h-px bg-[#D4AF37]/40" />
+                  ready to brew
                 </p>
+                {/* big title */}
+                <h1 className="text-5xl sm:text-6xl font-black leading-[1.0] tracking-[-0.03em] text-white/95 mb-4">
+                  What&apos;s<br />
+                  <span className="text-[#D4AF37]">brewing</span>
+                  <span className="font-light italic text-white/20">?</span>
+                </h1>
+                <p className="text-sm font-light text-white/35 leading-relaxed max-w-[280px] mb-8">
+                  Ask anything. Nothing leaves this session unless you save it to the Order Book.
+                </p>
+                {/* suggested prompts */}
+                <div className="flex flex-wrap gap-2">
+                  {["Plan my week", "Review my code", "Track a flight", "Show me a map", "Recall last order"].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setInputText(p)}
+                      className="px-3.5 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-white/40 text-[11.5px] hover:border-[#D4AF37]/45 hover:bg-[#D4AF37]/07 hover:text-white/70 transition-all backdrop-blur-sm"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               messages.map((m, i) => {
@@ -900,7 +992,7 @@ export default function App() {
         </div>
 
         {/* ── COMPOSER ─────────────────────────────────────────────────────── */}
-        <form onSubmit={handleSubmit} className="w-full max-w-3xl px-6 pb-8 pt-4 shrink-0 mx-auto bg-gradient-to-t from-[#050505] via-[#050505] to-transparent">
+        <form onSubmit={handleSubmit} className="w-full max-w-3xl px-6 pb-8 pt-4 shrink-0 mx-auto bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/95 to-transparent">
 
           {/* Feature #13: Pinned File Capsule */}
           <AnimatePresence>
@@ -911,7 +1003,7 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          <div ref={composerRef} className="relative flex items-end gap-2 rounded-2xl border border-zinc-800 bg-[#0A0A0A]/80 backdrop-blur-md px-3 py-2 focus-within:border-[#D4AF37]/60 transition-colors shadow-2xl">
+          <div ref={composerRef} className="relative flex items-end gap-2 border-b border-white/10 focus-within:border-[#D4AF37]/50 transition-colors pb-3">
 
             {/* Feature #4: Slash Command Menu */}
             <AnimatePresence>
@@ -953,8 +1045,27 @@ export default function App() {
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && !showSlash) {
+                  if (isMobile) {
+                    // Mobile: Enter = newline for cleaner paragraph writing
+                    // Use Shift+Enter or the send button to submit
+                    return;
+                  }
                   e.preventDefault();
                   handleSubmit();
+                }
+              }}
+              onPaste={async (e) => {
+                // Paste image from clipboard (like Gemini) — preview only, don't send yet
+                const items = Array.from(e.clipboardData?.items || []);
+                const imageItem = items.find(item => item.type.startsWith('image/'));
+                if (!imageItem) return;
+                e.preventDefault();
+                const file = imageItem.getAsFile();
+                if (!file) return;
+                const parsed = await parseAndAttachFile(file);
+                if (parsed) {
+                  const previewUrl = URL.createObjectURL(file);
+                  setPendingFile({ ...parsed, previewUrl });
                 }
               }}
               rows={1}
@@ -973,8 +1084,8 @@ export default function App() {
             </button>
           </div>
 
-          <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-600">
-            no history · order book remembers · ⏎ to send · ⌘K to focus
+          <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-white/10">
+            ⏎ send · ⌘K focus · / commands
           </p>
         </form>
       </main>
