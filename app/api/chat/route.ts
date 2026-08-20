@@ -100,7 +100,7 @@ SYSTEM PROTOCOLS (CRITICAL):
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "qwen/qwen3.8-27b",
         messages: [{ role: "system", content: systemInstruction }, ...cleanMessages],
       }),
     });
