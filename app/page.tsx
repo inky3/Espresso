@@ -275,7 +275,7 @@ function useDualStatus(user: User | null) {
     pingDb();
     const interval = setInterval(pingDb, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   return { netStatus, dbStatus };
 }
