@@ -349,7 +349,27 @@ function useEspressoAI() {
     return new Promise((resolve) => {
       const reader = new FileReader();
       if (file.type.startsWith('image/')) {
-        reader.onload = (e) => resolve({ name: file.name, text: `[IMAGE_BASE64:${file.type}]:${(e.target?.result as string)}` });
+        reader.onload = async (e) => {
+          try {
+            const bitmap = await createImageBitmap(file);
+            const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Canvas unavailable');
+            context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            bitmap.close();
+            const blob = await new Promise<Blob>((resolveBlob, rejectBlob) => canvas.toBlob((value) => value ? resolveBlob(value) : rejectBlob(new Error('Compression failed')), 'image/jpeg', 0.78));
+            const compressedReader = new FileReader();
+            compressedReader.onload = (event) => resolve({ name: file.name, text: `[IMAGE_BASE64:${blob.type}]:${event.target?.result as string}` });
+            compressedReader.onerror = () => resolve(null);
+            compressedReader.readAsDataURL(blob);
+          } catch {
+            const dataUrl = e.target?.result as string;
+            resolve(dataUrl && dataUrl.length <= 3500000 ? { name: file.name, text: `[IMAGE_BASE64:${file.type}]:${dataUrl}` } : null);
+          }
+        };
         reader.readAsDataURL(file);
       } else {
         reader.onload = (e) => resolve({ name: file.name, text: (e.target?.result as string).substring(0, 30000) });
@@ -505,7 +525,7 @@ function useEspressoAI() {
         openPanelFn('whiteboard');
       }
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: "CRITICAL_ERROR: Link failed." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "I couldn't send that message. Please check your connection and try again." }]);
     } finally {
       setStatus('active');
       setIsTyping(false);
