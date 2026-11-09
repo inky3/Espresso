@@ -12,6 +12,16 @@ export async function POST(req: Request) {
   const verified = await requireFirebaseUser(req);
   if (verified.error) return verified.error;
 
+  // Check server configuration before counting an attempt. Otherwise a missing
+  // environment variable can consume the user's attempts and lock them out.
+  const configuredPin = process.env.RIN_ACCESS_PIN;
+  if (!configuredPin) {
+    return NextResponse.json({ error: "Rin access is not configured on the server." }, { status: 503 });
+  }
+  if (!process.env.RIN_SESSION_SECRET || process.env.RIN_SESSION_SECRET.length < 32) {
+    return NextResponse.json({ error: "Rin session security is not configured." }, { status: 503 });
+  }
+
   const now = Date.now();
   const current = attempts.get(verified.user.uid);
   if (current && current.resetAt > now && current.count >= 5) {
@@ -21,14 +31,6 @@ export async function POST(req: Request) {
     attempts.set(verified.user.uid, { count: 1, resetAt: now + 15 * 60 * 1000 });
   } else {
     current.count += 1;
-  }
-
-  const configuredPin = process.env.RIN_ACCESS_PIN;
-  if (!configuredPin) {
-    return NextResponse.json({ error: "Rin access is not configured on the server." }, { status: 503 });
-  }
-  if (!process.env.RIN_SESSION_SECRET || process.env.RIN_SESSION_SECRET.length < 32) {
-    return NextResponse.json({ error: "Rin session security is not configured." }, { status: 503 });
   }
 
   try {
