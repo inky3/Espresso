@@ -34,7 +34,7 @@ body {
   display: none;
 }
 
-/* Rin's still artwork gets a restrained idle presence without distorting her face. */
+/* Keep Rin's portrait still; only the ambient background drifts gently. */
 .rin-ambient-image {
   filter: blur(18px) saturate(0.78) brightness(0.48);
   transform: scale(1.12);
@@ -47,6 +47,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rin-ambient-image,
+  .rin-ambient-image {
+    animation: none;
+  }
 }
 
