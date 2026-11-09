@@ -506,7 +506,7 @@ function useEspressoAI() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ messages: apiMessages, activeDocument, workspace: workspaceContent }),
+        body: JSON.stringify({ messages: apiMessages.slice(-20), activeDocument, workspace: workspaceContent }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Chat request failed (' + res.status + ').');
