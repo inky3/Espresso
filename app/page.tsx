@@ -819,10 +819,15 @@ export default function App() {
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!inputText.trim() && !pendingFile) || isTyping) return;
-    const sent = await processCommand(inputText, setOpenPanel, pendingFile);
-    if (sent !== false) {
-      setInputText('');
-      setPendingFile(null);
+    const submittedText = inputText;
+    const submittedFile = pendingFile;
+    // Clear immediately for responsive composer UX; retain a copy for retry on failure.
+    setInputText('');
+    setPendingFile(null);
+    const sent = await processCommand(submittedText, setOpenPanel, submittedFile);
+    if (sent === false) {
+      setInputText(current => current || submittedText);
+      setPendingFile(current => current || submittedFile);
     }
   };
 
