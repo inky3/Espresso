@@ -245,7 +245,7 @@ export default function RinPage() {
                 </div>
               </div>
               <div className="pointer-events-none absolute inset-x-0 bottom-[7%] top-[12%] flex items-end justify-center overflow-hidden">
-                <img src="/rin/portraits/rin-casual.webp" alt="Rin relaxing on a sofa in her cream sweater, with long dark hair, a white front streak, round glasses and a gentle smile" data-expression={characterExpression} data-outfit={characterOutfit} className={`rin-character-motion ${sending ? "rin-character-talking" : "rin-character-idle"} h-full w-auto max-w-[94%] select-none object-contain object-bottom drop-shadow-[0_18px_35px_rgba(0,0,0,0.28)]`} />
+                <img src="/rin/portraits/rin-casual.webp" alt="Rin relaxing on a sofa in her cream sweater, with long dark hair, a white front streak, round glasses and a gentle smile" data-expression={characterExpression} data-outfit={characterOutfit} className="h-full w-auto max-w-[94%] select-none object-contain object-bottom drop-shadow-[0_18px_35px_rgba(0,0,0,0.28)]" />
               </div>
               <div className="relative z-10 mt-auto bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-5 pb-5 pt-24 sm:px-7 sm:pb-7">
                 <p className="max-w-md text-sm font-light leading-relaxed text-zinc-300 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
