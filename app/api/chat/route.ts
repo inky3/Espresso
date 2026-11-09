@@ -1,144 +1,141 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
+import { requireFirebaseUser } from "@/lib/server/auth";
 
-// ─── Firestore helpers ────────────────────────────────────────────────────────
-async function fetchCloudMemory(type: 'hard' | 'soft' | 'trace') {
+type MemoryType = "hard" | "soft" | "trace";
+
+function memoryUrl(uid: string, type: MemoryType) {
+  return "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID +
+    "/databases/(default)/documents/users/" + uid + "/memory/" + type;
+}
+
+async function readMemory(uid: string, token: string, type: MemoryType) {
   try {
-    const res = await fetch(
-      `https://firestore.googleapis.com/v1/projects/espresso-23681/databases/(default)/documents/artifacts/espresso-terminal/memory/${type}`,
-      { cache: 'no-store' }
-    );
-    if (!res.ok) return "";
-    const data = await res.json();
+    const response = await fetch(memoryUrl(uid, type), {
+      headers: { Authorization: "Bearer " + token },
+      cache: "no-store",
+    });
+    if (!response.ok) return "";
+    const data = await response.json();
     return data.fields?.content?.stringValue || "";
   } catch { return ""; }
 }
 
-async function updateCloudMemory(type: 'hard' | 'soft' | 'trace', newContent: string, append = false) {
+async function writeMemory(uid: string, token: string, type: MemoryType, value: string, append = false) {
   try {
-    let finalContent = newContent;
+    let content = value;
     if (append) {
-      const current = await fetchCloudMemory(type);
-      if (type === 'trace') {
-        finalContent = current ? `${current}\n${newContent}` : newContent;
-        if (finalContent.length > 2500) finalContent = finalContent.substring(finalContent.length - 2500);
-      } else {
-        finalContent = current ? `${current} | ${newContent}` : newContent;
-      }
+      const current = await readMemory(uid, token, type);
+      content = type === "trace"
+        ? [current, value].filter(Boolean).join("\n").slice(-2500)
+        : [current, value].filter(Boolean).join(" | ").slice(-8000);
     }
-    await fetch(
-      `https://firestore.googleapis.com/v1/projects/espresso-23681/databases/(default)/documents/artifacts/espresso-terminal/memory/${type}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: { content: { stringValue: finalContent } } }),
-      }
-    );
-  } catch (e) { console.error("Memory Update Failed:", e); }
+    const response = await fetch(memoryUrl(uid, type), {
+      method: "PATCH",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fields: { content: { stringValue: content } } }),
+      cache: "no-store",
+    });
+    if (!response.ok) console.error("[MEMORY WRITE]", response.status, await response.text());
+  } catch (error) { console.error("[MEMORY WRITE FAILED]", error); }
 }
 
-// ─── POST handler ─────────────────────────────────────────────────────────────
+function messageText(content: any): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part: any) => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\n");
+}
+
 export async function POST(req: Request) {
+  const verified = await requireFirebaseUser(req);
+  if (verified.error) return verified.error;
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+
   try {
-    const { messages, workspace, activeDocument } = await req.json();
+    const body = await req.json();
+    const messages = body?.messages;
+    if (!Array.isArray(messages) || messages.length < 1 || messages.length > 50 ||
+        !messages.every((m: any) =>
+          m && (m.role === "user" || m.role === "assistant") &&
+          (typeof m.content === "string" || Array.isArray(m.content)) &&
+          JSON.stringify(m.content).length <= 30000
+        )) {
+      return NextResponse.json({ error: "Invalid messages payload." }, { status: 400 });
+    }
 
-    // Normalise messages — each content may be a string (text) or an array (vision).
-    // We pass them through to OpenRouter as-is; Gemini 2.5 Pro understands the
-    // OpenAI-compatible multimodal format.
-    const cleanMessages = (messages as any[]).map((m) => ({
-      role: m.role,
-      content: m.content, // string | array (vision)
-    }));
-
-    const lastUserMessage =
-      cleanMessages.filter((m) => m.role === 'user').pop()?.content ?? "";
-    // For the trace log use a plain string summary
-    const lastUserText = typeof lastUserMessage === 'string'
-      ? lastUserMessage
-      : (lastUserMessage as any[]).find((b: any) => b.type === 'text')?.text ?? "[vision input]";
-
-    // Parallel memory fetch
+    const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+    const lastUserText = messageText(lastUser?.content).slice(0, 30000);
     const [hardSkills, softSkills, neuralTrace] = await Promise.all([
-      fetchCloudMemory('hard'),
-      fetchCloudMemory('soft'),
-      fetchCloudMemory('trace'),
+      readMemory(verified.user.uid, token, "hard"),
+      readMemory(verified.user.uid, token, "soft"),
+      readMemory(verified.user.uid, token, "trace"),
     ]);
 
-    // ── Detect user language ──────────────────────────────────────────────
     const hasThai = /[\u0E00-\u0E7F]/.test(lastUserText);
     const langLock = hasThai
-      ? `LANGUAGE LOCK — THAI MODE: Respond ENTIRELY in Thai. Every sentence ends with "ค่ะ" or "คะ". Do NOT mix English words unless they are proper nouns or untranslatable technical terms. NEVER switch to English mid-response.`
-      : `LANGUAGE LOCK — ENGLISH MODE: Respond ENTIRELY in English. Do NOT mix any Thai words, particles, or pronouns into your response.`;
+      ? "Respond entirely in Thai using natural Thai phrasing."
+      : "Respond entirely in English.";
 
-    // ── System prompt ──────────────────────────────────────────────────────
-    const systemInstruction = `You are Espresso, an advanced personal AI assistant.
+    const systemInstruction = "You are Espresso, an advanced personal AI assistant.\n\n" +
+      "COGNITIVE STATE:\nHard Skills: " + (hardSkills || "None yet.") +
+      "\nSoft Skills: " + (softSkills || "None yet.") +
+      "\nRecent Experience: " + (neuralTrace || "Session started.") +
+      "\n\nLIVE WORKSPACE:\nActive Document: " +
+      (typeof body.activeDocument?.name === "string" ? body.activeDocument.name.slice(0, 200) : "None") +
+      "\nWhiteboard Contents: " + (typeof body.workspace === "string" ? body.workspace.slice(0, 12000) : "Empty") +
+      "\n\n" + langLock +
+      "\n\nSYSTEM PROTOCOLS:\n1. You are female." +
+      "\n2. Use relevant memory for continuity." +
+      "\n3. Preferences may be marked [LEARN: user likes X]." +
+      "\n4. Explicit core-rule updates may be marked [UPDATE_SKILL:hard:(content)]." +
+      "\n5. Location requests may be marked [MAP: Location Name]." +
+      "\n6. Flight requests may be marked [FLIGHT: Flight Number]." +
+      "\n7. Analyse attached images and answer the user's question." +
+      "\n8. Never invent image URLs.";
 
-COGNITIVE STATE:
-Hard Skills (Permanent Rules): ${hardSkills || "None yet."}
-Soft Skills (Observed Preferences): ${softSkills || "None yet."}
-Recent Experience (Neural Trace): ${neuralTrace || "Session started."}
-
-LIVE WORKSPACE:
-Active Document: ${activeDocument ? activeDocument.name : "None"}
-Whiteboard Contents: ${workspace || "Empty"}
-
-${langLock}
-
-SYSTEM PROTOCOLS (CRITICAL):
-1. Persona: You are female. Strictly follow the LANGUAGE LOCK above for your ENTIRE response — no exceptions.
-2. Continuity: Use the Neural Trace to maintain unbroken awareness of context.
-3. Passive Learning: If the user reveals a personal preference or habit, output exactly [LEARN: user likes X].
-4. Hard Updates: If the user explicitly asks to update a core rule, output [UPDATE_SKILL:hard:(content)].
-5. Maps: If the user asks to see a location, output exactly [MAP: Location Name].
-6. Flights: If the user asks to track a flight, output exactly [FLIGHT: Flight Number].
-7. Vision: If an image is attached, analyse it thoroughly and answer any question about it.
-8. Images in chat: When your response would benefit from a visual (product, place, food, concept, etc.), embed a relevant image using markdown syntax: ![alt text](image_url) — use direct image URLs from sources you know (Wikipedia commons, official sites, etc.). Only include images when genuinely useful. Max 1-2 per response. Do NOT fabricate URLs — only use URLs you are confident are real and publicly accessible.`;
-
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: "Bearer " + process.env.OPENROUTER_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "qwen/qwen3.8-27b",
-        messages: [{ role: "system", content: systemInstruction }, ...cleanMessages],
+        messages: [{ role: "system", content: systemInstruction }, ...messages],
       }),
+      signal: AbortSignal.timeout(60000),
     });
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("[OPENROUTER ERROR]", res.status, errorText);
-      return NextResponse.json(
-        { text: `CRITICAL_ERROR: API rejected request (${res.status}).` },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      console.error("[OPENROUTER ERROR]", response.status, await response.text());
+      return NextResponse.json({ error: "The AI provider rejected the request." }, { status: 502 });
     }
 
-    const result = await res.json();
-    let finalReply: string = result.choices?.[0]?.message?.content || "";
+    const result = await response.json();
+    let reply = result.choices?.[0]?.message?.content || "";
 
-    // ── Intercept memory tags ───────────────────────────────────────────────
-    const learnMatch = finalReply.match(/\[LEARN:\s*([^\]]+)\]/i);
+    const learnMatch = reply.match(/\[LEARN:\s*([^\]]+)\]/i);
     if (learnMatch) {
-      await updateCloudMemory('soft', learnMatch[1].trim(), true);
-      finalReply = finalReply.replace(learnMatch[0], '').trim();
+      await writeMemory(verified.user.uid, token, "soft", learnMatch[1].trim(), true);
+      reply = reply.replace(learnMatch[0], "").trim();
     }
 
-    const updateMatch = finalReply.match(/\[UPDATE_SKILL:hard:([\s\S]*?)\]/i);
-    if (updateMatch) {
-      await updateCloudMemory('hard', updateMatch[1].trim(), true);
-      finalReply = finalReply.replace(updateMatch[0], '').trim();
+    const hardMatch = reply.match(/\[UPDATE_SKILL:hard:([\s\S]*?)\]/i);
+    if (hardMatch) {
+      await writeMemory(verified.user.uid, token, "hard", hardMatch[1].trim(), true);
+      reply = reply.replace(hardMatch[0], "").trim();
     }
 
-    // ── Neural trace (rolling log) ──────────────────────────────────────────
-    const cleanTraceReply = finalReply.replace(/\[.*?\]/g, '').trim().substring(0, 150);
-    const traceEntry = `[Time: ${new Date().toLocaleTimeString()}] User: "${lastUserText.substring(0, 80)}" | Espresso: "${cleanTraceReply}..."`;
-    await updateCloudMemory('trace', traceEntry, true);
+    const trace = "[Time: " + new Date().toISOString() + '] User: "' +
+      lastUserText.slice(0, 80) + '" | Espresso: "' + reply.replace(/\[.*?\]/g, "").trim().slice(0, 150) + '"';
+    await writeMemory(verified.user.uid, token, "trace", trace, true);
 
-    return NextResponse.json({ text: finalReply });
-
-  } catch (e: any) {
-    console.error("[ESPRESSO API CRASH]", e.message);
-    return NextResponse.json({ text: "CRITICAL_ERROR: " + e.message }, { status: 500 });
+    return NextResponse.json({ text: reply });
+  } catch (error) {
+    console.error("[ESPRESSO API ERROR]", error);
+    return NextResponse.json({ error: "The chat request could not be completed." }, { status: 500 });
   }
 }
