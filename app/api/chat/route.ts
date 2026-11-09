@@ -52,7 +52,7 @@ function messageText(content: any): string {
 export async function POST(req: Request) {
   const verified = await requireFirebaseUser(req);
   if (verified.error) return verified.error;
-  const token = (req.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
 
   try {
     const body = await req.json();
