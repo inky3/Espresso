@@ -30,26 +30,22 @@ async function readMemory(uid: string, token: string) {
       history,
     };
   } catch {
-    return { summary: "", trace: "" };
+    return { summary: "", trace: "", history: [] as { role: "user" | "assistant"; content: string }[] };
   }
 }
 
 async function persistMemory(uid: string, token: string, summary: string, trace: string, history: { role: "user" | "assistant"; content: string }[]) {
   try {
-    const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`, {
-      method: "POST",
+    const updateMask = "updateMask.fieldPaths=summary&updateMask.fieldPaths=trace&updateMask.fieldPaths=history";
+    const response = await fetch(`https://firestore.googleapis.com/v1/${documentName(uid)}?${updateMask}`, {
+      method: "PATCH",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        writes: [{
-          update: {
-            name: documentName(uid),
-            fields: {
-              summary: { stringValue: summary.slice(-6000) },
-              trace: { stringValue: trace.slice(-10000) },
-              history: { stringValue: JSON.stringify(history.slice(-40)) },
-            },
-          },
-        }],
+        fields: {
+          summary: { stringValue: summary.slice(-6000) },
+          trace: { stringValue: trace.slice(-10000) },
+          history: { stringValue: JSON.stringify(history.slice(-40)) },
+        },
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(7000),
