@@ -15,7 +15,23 @@ import { auth, db } from '@/lib/firebase';
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-const appId = 'espresso-terminal'; 
+const appId = 'espresso-terminal';
+
+async function getReadyFirebaseIdToken(timeoutMs = 12000): Promise<string> {
+  if (auth.currentUser) return auth.currentUser.getIdToken();
+  return new Promise((resolve, reject) => {
+    let unsubscribe = () => {};
+    const timeout = setTimeout(() => { unsubscribe(); reject(new Error('Sign-in is taking too long. Please try again.')); }, timeoutMs);
+    unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) return;
+      clearTimeout(timeout);
+      unsubscribe();
+      try { resolve(await currentUser.getIdToken()); }
+      catch { reject(new Error('Could not refresh your sign-in. Please try again.')); }
+    });
+  });
+}
+ 
 
 type PanelKey = 'display' | 'whiteboard' | 'orderbook' | null;
 
@@ -463,14 +479,15 @@ function useEspressoAI() {
         return { role: m.role, content: finalContent };
       });
 
-      const idToken = user ? await user.getIdToken() : '';
+      const idToken = await getReadyFirebaseIdToken();
       if (!idToken) throw new Error('Authentication required');
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ messages: apiMessages, activeDocument, workspace: workspaceContent }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Chat request failed (' + res.status + ').');
       const replyText = data.text;
 
       setMessages(prev => [...prev, { role: 'assistant', content: replyText, timestamp: Date.now() }]);
