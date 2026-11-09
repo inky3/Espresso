@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { db } from '../../lib/firebase';
+import { auth, db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { findLocation, type Coords } from './geocode';
 
@@ -199,7 +199,9 @@ export function useEspressoAI() {
         if (file.size > MAX_PDF_BYTES) throw new Error('PDF is larger than 4 MB.');
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch('/api/pdf', { method: 'POST', body: formData });
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('Sign in before uploading a PDF.');
+        const res = await fetch('/api/pdf', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: formData });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Server failed to parse PDF.');
         extractedText = data.text ?? '';
@@ -274,9 +276,11 @@ export function useEspressoAI() {
       const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
 
       try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('Sign in before sending a message.');
         const res = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
           body: JSON.stringify({ messages: history, context: memoryRef.current }),
           signal: controller.signal,
         });
