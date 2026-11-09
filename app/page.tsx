@@ -527,8 +527,9 @@ function useEspressoAI() {
         openPanelFn('whiteboard');
       }
       return true;
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: "I couldn't send that message. Please check your connection and try again." }]);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Please check your connection and try again.';
+      setMessages(prev => [...prev.filter(message => message !== userMsg), { role: 'assistant', content: 'I could not send that message: ' + reason }]);
       return false;
     } finally {
       setStatus('active');
