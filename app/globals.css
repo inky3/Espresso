@@ -33,3 +33,34 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Rin's still artwork gets a restrained idle presence without distorting her face. */
+.rin-ambient-image {
+  filter: blur(18px) saturate(0.78) brightness(0.48);
+  transform: scale(1.12);
+  animation: rin-room-drift 28s ease-in-out infinite alternate;
+}
+
+.rin-character-idle {
+  transform-origin: 50% 88%;
+  animation: rin-idle-breathe 5.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes rin-idle-breathe {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -7px, 0) scale(1.008); }
+}
+
+@keyframes rin-room-drift {
+  0% { transform: scale(1.12) translate3d(-0.4%, 0, 0); }
+  100% { transform: scale(1.17) translate3d(0.5%, -0.5%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rin-ambient-image,
+  .rin-character-idle {
+    animation: none;
+  }
+}
+
