@@ -320,9 +320,13 @@ function useEspressoAI() {
   };
 
   const deleteOrder = async (id: string) => {
-    if (!db) return;
-    try { await deleteDoc(doc(db, 'users', user.uid, 'archives', id)); } catch (e) {}
-    fetchOrderBook();
+    if (!db || !user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'archives', id));
+      await fetchOrderBook();
+    } catch (e) {
+      console.error('Failed to delete order:', e);
+    }
   };
 
   const parseAndAttachFile = useCallback(async (file: File): Promise<{ name: string; text: string } | null> => {
