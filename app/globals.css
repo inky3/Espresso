@@ -34,20 +34,49 @@ body {
   display: none;
 }
 
-/* Keep Rin's portrait still; only the ambient background drifts gently. */
+/* The room is a fixed, softened plate. Only the clipped Rin layer moves. */
 .rin-ambient-image {
   filter: blur(18px) saturate(0.78) brightness(0.48);
   transform: scale(1.12);
-  animation: rin-room-drift 28s ease-in-out infinite alternate;
 }
 
-@keyframes rin-room-drift {
-  0% { transform: scale(1.12) translate3d(-0.4%, 0, 0); }
-  100% { transform: scale(1.17) translate3d(0.5%, -0.5%, 0); }
+.rin-character-motion {
+  /* Approximate silhouette mask for the supplied flattened portrait.
+     The room outside this shape stays on the stationary ambient layer. */
+  clip-path: polygon(
+    43% 14%, 48% 13%, 55% 14%, 61% 18%, 67% 24%, 72% 28%,
+    78% 30%, 84% 33%, 91% 37%, 99% 41%, 100% 53%, 97% 64%,
+    95% 75%, 91% 82%, 84% 83%, 77% 81%, 71% 79%, 65% 81%,
+    58% 82%, 51% 80%, 45% 78%, 39% 75%, 33% 72%, 27% 70%,
+    21% 68%, 16% 65%, 12% 61%, 10% 55%, 10% 49%, 12% 43%,
+    16% 39%, 22% 37%, 26% 34%, 30% 29%, 34% 24%, 38% 18%
+  );
+  transform-origin: 52% 78%;
+  will-change: transform;
+}
+
+.rin-character-idle {
+  animation: rin-idle-breath 3.8s ease-in-out infinite;
+}
+
+.rin-character-talking {
+  animation: rin-talking-bob 620ms ease-in-out infinite;
+}
+
+@keyframes rin-idle-breath {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -2px, 0) scale(1.001); }
+}
+
+@keyframes rin-talking-bob {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  48% { transform: translate3d(0, -4px, 0) scale(1.002); }
+  72% { transform: translate3d(0, -1px, 0) scale(1.001); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rin-ambient-image {
+  .rin-character-idle,
+  .rin-character-talking {
     animation: none;
   }
 }
