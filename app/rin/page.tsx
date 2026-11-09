@@ -35,6 +35,13 @@ export default function RinPage() {
           });
           const data = await response.json();
           setUnlocked(Boolean(data.unlocked));
+          if (data.unlocked) {
+            const historyResponse = await fetch("/api/rin/chat", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+            if (historyResponse.ok) {
+              const historyData = await historyResponse.json();
+              if (Array.isArray(historyData.messages)) setMessages(historyData.messages.filter((item: any) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string"));
+            }
+          }
         } catch {
           setUnlocked(false);
         }
@@ -111,6 +118,7 @@ export default function RinPage() {
     } finally {
       setUnlocked(false);
       setPin("");
+      setMessages([]);
       setLocking(false);
     }
   }
@@ -189,7 +197,7 @@ export default function RinPage() {
               </div>
               {chatError && <p role="alert" className="mb-3 text-xs leading-5 text-red-400">{chatError}</p>}
               <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-[#c6a45b]/40">
-                <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(event as unknown as FormEvent); } }} rows={1} maxLength={8000} placeholder="Say something to Rin…" aria-label="Message Rin" className="max-h-32 min-h-11 flex-1 resize-y bg-transparent px-3 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600" />
+                <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={1} maxLength={8000} placeholder="Say something to Rin…" aria-label="Message Rin" className="max-h-32 min-h-11 flex-1 resize-y bg-transparent px-3 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600" />
                 <button type="submit" disabled={!draft.trim() || sending} className="mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#c6a45b] text-black transition-opacity hover:opacity-90 disabled:opacity-30" aria-label="Send message">↑</button>
               </form>
               <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.17em] text-zinc-700">Private · Session-bound · Lockable</p>
