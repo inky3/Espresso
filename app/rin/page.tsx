@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -13,6 +13,15 @@ export default function RinPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [locking, setLocking] = useState(false);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, sending]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (current) => {
@@ -62,6 +71,35 @@ export default function RinPage() {
       setError(err instanceof Error ? err.message : "Unable to unlock Rin.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function sendMessage(event: FormEvent) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || !user || sending) return;
+    setDraft("");
+    setChatError("");
+    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    setMessages(nextMessages);
+    setSending(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/rin/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ messages: nextMessages.slice(-20) }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
+      if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
+      setMessages((current) => [...current, { role: "assistant", content: data.text }]);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Message could not be sent.");
+      setDraft((current) => current || text);
+      setMessages((current) => current.filter((message, index) => !(index === current.length - 1 && message.role === "user" && message.content === text)));
+    } finally {
+      setSending(false);
     }
   }
 
@@ -132,14 +170,29 @@ export default function RinPage() {
                 <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-500">Conversation</p>
                 <span className="h-1.5 w-1.5 rounded-full bg-[#c6a45b]" />
               </div>
-              <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-                <div className="mb-5 grid h-12 w-12 place-items-center rounded-full border border-[#c6a45b]/20 bg-[#c6a45b]/[0.06] text-lg font-light text-[#d5bd88]">R</div>
-                <h2 className="text-lg font-light text-zinc-200">A space for the two of you</h2>
-                <p className="mt-2 max-w-xs text-xs leading-6 text-zinc-500">Rin’s private conversation is the next stage. Her memory will be kept separate from Espresso’s main assistant.</p>
-                <span className="mt-5 rounded-full border border-white/[0.08] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-600">Conversation not connected yet</span>
+              <div className="my-5 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">
+                {messages.length === 0 ? (
+                  <div className="flex h-full min-h-[180px] flex-col items-center justify-center text-center">
+                    <div className="mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#c6a45b]/20 bg-[#c6a45b]/[0.06] text-lg font-light text-[#d5bd88]">R</div>
+                    <h2 className="text-base font-light text-zinc-200">Hey. I'm here.</h2>
+                    <p className="mt-2 max-w-xs text-xs leading-6 text-zinc-500">Tell me what's on your mind. We can talk, plan, or figure something out together.</p>
+                  </div>
+                ) : messages.map((message, index) => (
+                  <div key={index} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                    <div className={message.role === "user" ? "max-w-[88%] rounded-2xl rounded-br-md bg-[#c6a45b]/15 px-4 py-3 text-sm leading-6 text-zinc-100" : "max-w-[92%] rounded-2xl rounded-bl-md border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-sm leading-6 text-zinc-300"}>
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+                {sending && <div className="flex justify-start"><div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-xs text-zinc-500">Rin is thinking…</div></div>}
+                <div ref={conversationEndRef} />
               </div>
-              <div className="rounded-2xl border border-white/[0.07] bg-black/30 px-4 py-3 text-xs text-zinc-600">Your private conversation will appear here.</div>
-              <p className="mt-4 text-center font-mono text-[9px] uppercase tracking-[0.17em] text-zinc-700">Private · Session-bound · Lockable</p>
+              {chatError && <p role="alert" className="mb-3 text-xs leading-5 text-red-400">{chatError}</p>}
+              <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-[#c6a45b]/40">
+                <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(event as unknown as FormEvent); } }} rows={1} maxLength={8000} placeholder="Say something to Rin…" aria-label="Message Rin" className="max-h-32 min-h-11 flex-1 resize-y bg-transparent px-3 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600" />
+                <button type="submit" disabled={!draft.trim() || sending} className="mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#c6a45b] text-black transition-opacity hover:opacity-90 disabled:opacity-30" aria-label="Send message">↑</button>
+              </form>
+              <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.17em] text-zinc-700">Private · Session-bound · Lockable</p>
             </aside>
           </div>
         </div>
