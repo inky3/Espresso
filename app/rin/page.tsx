@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
@@ -40,7 +41,7 @@ export default function RinPage() {
     return unsubscribe;
   }, []);
 
-  async function unlock(event: React.FormEvent) {
+  async function unlock(event: FormEvent) {
     event.preventDefault();
     if (!user || !pin || busy) return;
     setBusy(true);
