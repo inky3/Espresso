@@ -213,7 +213,7 @@ export default function RinPage() {
               </div>
             </section>
 
-            <aside className={`fixed inset-x-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#101013]/[0.98] p-4 shadow-[0_-12px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height] duration-300 lg:static lg:z-auto lg:h-auto lg:min-h-0 lg:rounded-[28px] lg:p-7 lg:shadow-none lg:backdrop-blur-none ${mobileChatOpen ? "h-[68dvh]" : "h-[62px]"}`}>
+            <aside className={`fixed inset-x-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#101013]/[0.98] p-4 shadow-[0_-12px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height] duration-300 lg:static lg:z-auto lg:h-auto lg:min-h-0 lg:rounded-[28px] lg:p-7 lg:shadow-none lg:backdrop-blur-none ${mobileChatOpen ? "h-[68dvh]" : "h-[72px]"}`}>
               <button type="button" onClick={() => setMobileChatOpen((open) => !open)} className="flex min-h-8 items-center justify-between text-left lg:pointer-events-none">
                 <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">Conversation <span className="ml-2 text-zinc-600 lg:hidden">{mobileChatOpen ? "Close" : "Open chat"}</span></span>
                 <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#c6a45b]" /><span className="text-zinc-500 lg:hidden">{mobileChatOpen ? "⌄" : "⌃"}</span></span>
