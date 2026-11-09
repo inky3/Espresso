@@ -16,18 +16,25 @@ async function readMemory(uid: string, token: string) {
       cache: "no-store",
       signal: AbortSignal.timeout(4000),
     });
-    if (!response.ok) return { summary: "", trace: "" };
+    if (!response.ok) return { summary: "", trace: "", history: [] as { role: "user" | "assistant"; content: string }[] };
     const data = await response.json();
+    let history: { role: "user" | "assistant"; content: string }[] = [];
+    try {
+      const raw = data.fields?.history?.stringValue;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) history = parsed.filter((item) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string").slice(-40);
+    } catch { history = []; }
     return {
       summary: typeof data.fields?.summary?.stringValue === "string" ? data.fields.summary.stringValue : "",
       trace: typeof data.fields?.trace?.stringValue === "string" ? data.fields.trace.stringValue : "",
+      history,
     };
   } catch {
     return { summary: "", trace: "" };
   }
 }
 
-async function persistMemory(uid: string, token: string, summary: string, trace: string) {
+async function persistMemory(uid: string, token: string, summary: string, trace: string, history: { role: "user" | "assistant"; content: string }[]) {
   try {
     const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`, {
       method: "POST",
@@ -39,6 +46,7 @@ async function persistMemory(uid: string, token: string, summary: string, trace:
             fields: {
               summary: { stringValue: summary.slice(-6000) },
               trace: { stringValue: trace.slice(-10000) },
+              history: { stringValue: JSON.stringify(history.slice(-40)) },
             },
           },
         }],
@@ -50,6 +58,15 @@ async function persistMemory(uid: string, token: string, summary: string, trace:
   } catch (error) {
     console.error("[RIN MEMORY WRITE FAILED]", error);
   }
+}
+
+export async function GET(req: Request) {
+  const verified = await requireFirebaseUser(req);
+  if (verified.error) return verified.error;
+  if (!verifyRinSession(req, verified.user.uid)) return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const memory = await readMemory(verified.user.uid, token);
+  return NextResponse.json({ messages: memory.history });
 }
 
 export async function POST(req: Request) {
@@ -113,7 +130,8 @@ ${memory.trace || "This is the beginning of the private conversation."}`;
 
     const lastUser = [...messages].reverse().find((message: any) => message.role === "user")?.content || "";
     const trace = [memory.trace, `You: ${lastUser.slice(0, 350)}\nRin: ${reply.slice(0, 500)}`].filter(Boolean).join("\n\n").slice(-10000);
-    after(async () => persistMemory(verified.user.uid, token, memory.summary, trace));
+    const history = [...memory.history, ...messages.slice(-2), { role: "assistant" as const, content: reply }].slice(-40);
+    after(async () => persistMemory(verified.user.uid, token, memory.summary, trace, history));
 
     return NextResponse.json({ text: reply });
   } catch (error) {
