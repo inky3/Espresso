@@ -182,7 +182,11 @@ export default function RinPage() {
 
           <div className="grid flex-1 grid-cols-1 gap-4 py-4 lg:min-h-[calc(100dvh-110px)] lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:gap-6 lg:py-6">
             <section className="relative isolate flex min-h-[calc(100dvh-112px)] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#111115] lg:min-h-0">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,rgba(163,137,86,0.17),transparent_55%),linear-gradient(180deg,#17171b_0%,#0d0e11_100%)]" />
+              <div className="pointer-events-none absolute inset-0 overflow-hidden bg-[#17120e]">
+                <img src="/rin/portraits/rin-casual.webp" alt="" aria-hidden="true" className="rin-ambient-image absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,9,9,0.72)_0%,rgba(10,9,9,0.2)_42%,rgba(10,9,9,0.08)_72%,rgba(10,9,9,0.38)_100%),linear-gradient(0deg,rgba(8,8,9,0.88)_0%,transparent_42%,rgba(8,8,9,0.16)_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_58%_42%,transparent_10%,rgba(0,0,0,0.22)_82%)]" />
+              </div>
               <div className="relative z-10 flex items-start justify-between px-5 pt-5 sm:px-7 sm:pt-7">
                 <div>
                   <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-500">Your companion</p>
@@ -240,8 +244,8 @@ export default function RinPage() {
                   <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.15em] text-emerald-300/80">Private</span>
                 </div>
               </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[13%] flex items-end justify-center overflow-hidden">
-                <img src="/rin/portraits/rin-casual.webp" alt="Rin relaxing on a sofa in her cream sweater, with long dark hair, a white front streak, round glasses and a gentle smile" data-expression={characterExpression} data-outfit={characterOutfit} className="h-full w-full select-none object-contain object-bottom opacity-100" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-[7%] top-[12%] flex items-end justify-center overflow-hidden">
+                <img src="/rin/portraits/rin-casual.webp" alt="Rin relaxing on a sofa in her cream sweater, with long dark hair, a white front streak, round glasses and a gentle smile" data-expression={characterExpression} data-outfit={characterOutfit} className="rin-character-idle h-full w-auto max-w-[94%] select-none object-contain object-bottom drop-shadow-[0_18px_35px_rgba(0,0,0,0.28)]" />
               </div>
               <div className="relative z-10 mt-auto bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-5 pb-5 pt-24 sm:px-7 sm:pb-7">
                 <p className="max-w-md text-sm font-light leading-relaxed text-zinc-300 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
