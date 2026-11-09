@@ -19,6 +19,7 @@ export default function RinPage() {
   const [chatError, setChatError] = useState("");
   const [characterExpression, setCharacterExpression] = useState("neutral");
   const [manualExpression, setManualExpression] = useState("");
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
 
   const conversationEndRef = useRef<HTMLDivElement>(null);
 
@@ -142,7 +143,7 @@ export default function RinPage() {
   }
 
   return (
-    <main className="relative min-h-[100dvh] overflow-hidden bg-[#080808] text-zinc-100 selection:bg-[#c9a85d]/30">
+    <main className="relative h-[100dvh] overflow-y-auto overscroll-contain bg-[#080808] text-zinc-100 selection:bg-[#c9a85d]/30">
       {!unlocked ? (
         <div className="min-h-[100dvh] flex items-center justify-center px-5 py-10">
           <section className="w-full max-w-md">
@@ -169,7 +170,7 @@ export default function RinPage() {
           </header>
 
           <div className="grid flex-1 grid-cols-1 gap-4 py-4 lg:min-h-[calc(100dvh-110px)] lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:gap-6 lg:py-6">
-            <section className="relative isolate flex min-h-[66dvh] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#111115] lg:min-h-0">
+            <section className="relative isolate flex min-h-[calc(100dvh-112px)] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#111115] lg:min-h-0">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,rgba(163,137,86,0.17),transparent_55%),linear-gradient(180deg,#17171b_0%,#0d0e11_100%)]" />
               <div className="relative z-10 flex items-start justify-between px-5 pt-5 sm:px-7 sm:pt-7">
                 <div>
@@ -212,12 +213,12 @@ export default function RinPage() {
               </div>
             </section>
 
-            <aside className="flex min-h-[270px] flex-col rounded-[28px] border border-white/[0.08] bg-[#101013] p-5 sm:p-7 lg:min-h-0">
-              <div className="flex items-center justify-between">
-                <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-500">Conversation</p>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#c6a45b]" />
-              </div>
-              <div className="my-5 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">
+            <aside className={`fixed inset-x-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#101013]/[0.98] p-4 shadow-[0_-12px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height] duration-300 lg:static lg:z-auto lg:min-h-0 lg:rounded-[28px] lg:p-7 lg:shadow-none lg:backdrop-blur-none ${mobileChatOpen ? "h-[68dvh]" : "h-[62px]"}`}>
+              <button type="button" onClick={() => setMobileChatOpen((open) => !open)} className="flex min-h-8 items-center justify-between text-left lg:pointer-events-none">
+                <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">Conversation <span className="ml-2 text-zinc-600 lg:hidden">{mobileChatOpen ? "Close" : "Open chat"}</span></span>
+                <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#c6a45b]" /><span className="text-zinc-500 lg:hidden">{mobileChatOpen ? "⌄" : "⌃"}</span></span>
+              </button>
+              <div className={`${mobileChatOpen ? "flex" : "hidden"} my-5 flex-1 space-y-4 overflow-y-auto pr-1 lg:flex`} aria-live="polite">
                 {messages.length === 0 ? (
                   <div className="flex h-full min-h-[180px] flex-col items-center justify-center text-center">
                     <div className="mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#c6a45b]/20 bg-[#c6a45b]/[0.06] text-lg font-light text-[#d5bd88]">R</div>
@@ -234,12 +235,12 @@ export default function RinPage() {
                 {sending && <div className="flex justify-start"><div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-xs text-zinc-500">Rin is thinking…</div></div>}
                 <div ref={conversationEndRef} />
               </div>
-              {chatError && <p role="alert" className="mb-3 text-xs leading-5 text-red-400">{chatError}</p>}
-              <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-[#c6a45b]/40">
+              {chatError && <p role="alert" className={`${mobileChatOpen ? "block" : "hidden"} mb-3 text-xs leading-5 text-red-400 lg:block`}>{chatError}</p>}
+              <form onSubmit={sendMessage} className={`${mobileChatOpen ? "flex" : "hidden"} items-end gap-2 rounded-2xl border border-white/10 bg-black/30 p-2 focus-within:border-[#c6a45b]/40 lg:flex`}>
                 <textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={1} maxLength={8000} placeholder="Say something to Rin…" aria-label="Message Rin" className="max-h-32 min-h-11 flex-1 resize-y bg-transparent px-3 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600" />
                 <button type="submit" disabled={!draft.trim() || sending} className="mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#c6a45b] text-black transition-opacity hover:opacity-90 disabled:opacity-30" aria-label="Send message">↑</button>
               </form>
-              <p className="mt-3 text-center font-mono text-[9px] uppercase tracking-[0.17em] text-zinc-700">Private · Session-bound · Lockable</p>
+              <p className={`${mobileChatOpen ? "block" : "hidden"} mt-3 text-center font-mono text-[9px] uppercase tracking-[0.17em] text-zinc-700 lg:block`}>Private · Session-bound · Lockable</p>
             </aside>
           </div>
         </div>
