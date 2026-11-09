@@ -130,7 +130,8 @@ ${memory.trace || "This is the beginning of the private conversation."}`;
 
     const lastUser = [...messages].reverse().find((message: any) => message.role === "user")?.content || "";
     const trace = [memory.trace, `You: ${lastUser.slice(0, 350)}\nRin: ${reply.slice(0, 500)}`].filter(Boolean).join("\n\n").slice(-10000);
-    const history = [...memory.history, ...messages.slice(-2), { role: "assistant" as const, content: reply }].slice(-40);
+    const lastUserMessage = [...messages].reverse().find((message: any) => message.role === "user");
+    const history = [...memory.history, ...(lastUserMessage ? [{ role: "user" as const, content: lastUserMessage.content }] : []), { role: "assistant" as const, content: reply }].slice(-40);
     after(async () => persistMemory(verified.user.uid, token, memory.summary, trace, history));
 
     return NextResponse.json({ text: reply });
