@@ -167,10 +167,15 @@ export function useEspressoAI() {
     memoryRef.current = next;
     writeLocal(next);
 
+    // Keep local memory available even before authentication is ready.
+    // Cloud memory is always scoped to the currently authenticated user.
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
     // Not awaited on purpose: while offline Firestore keeps the write queued
     // and the promise stays pending, which must never block the chat.
     setDoc(
-      memoryDocRef(),
+      memoryDocRef(uid),
       {
         memory: { [category]: category === 'personal_tags' ? arrayUnion(String(data)) : data },
         lastUpdate: serverTimestamp(),
