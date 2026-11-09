@@ -524,8 +524,10 @@ function useEspressoAI() {
       } else if (replyText.includes('```')) {
         openPanelFn('whiteboard');
       }
+      return true;
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: "I couldn't send that message. Please check your connection and try again." }]);
+      return false;
     } finally {
       setStatus('active');
       setIsTyping(false);
@@ -811,12 +813,14 @@ export default function App() {
     e.target.value = '';
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!inputText.trim() && !pendingFile) || isTyping) return;
-    processCommand(inputText, setOpenPanel, pendingFile);
-    setInputText('');
-    setPendingFile(null);
+    const sent = await processCommand(inputText, setOpenPanel, pendingFile);
+    if (sent !== false) {
+      setInputText('');
+      setPendingFile(null);
+    }
   };
 
   const mainLayoutClass = openPanel === 'display' ? 'pt-[50vh] md:pt-0 md:w-1/3 flex-none' : openPanel ? 'flex-1 md:mr-[400px] lg:mr-[450px]' : 'flex-1 mr-0';
