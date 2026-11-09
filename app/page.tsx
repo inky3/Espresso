@@ -259,11 +259,13 @@ function useDualStatus(user: User | null) {
   useEffect(() => {
     const pingDb = async () => {
       if (!navigator.onLine) { setDbStatus('error'); return; }
+      if (!user) { setDbStatus('checking'); return; }
       try {
         setDbStatus('checking');
+        const token = await user.getIdToken();
         const res = await fetch(
-          'https://firestore.googleapis.com/v1/projects/espresso-11e63/databases/(default)/documents/artifacts/espresso-terminal/memory/trace',
-          { cache: 'no-store', signal: AbortSignal.timeout(5000) }
+          `https://firestore.googleapis.com/v1/projects/espresso-11e63/databases/(default)/documents/users/${user.uid}/memory/trace`,
+          { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(5000) }
         );
         setDbStatus(res.ok || res.status === 404 ? 'connected' : 'error');
       } catch {
