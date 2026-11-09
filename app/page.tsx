@@ -312,7 +312,7 @@ function useEspressoAI() {
   const fetchOrderBook = async () => {
     if (!user || !db) return;
     try {
-      const snap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'archives'));
+      const snap = await getDocs(collection(db, 'users', user.uid, 'archives'));
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       items.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setOrderBookItems(items);
@@ -321,7 +321,7 @@ function useEspressoAI() {
 
   const deleteOrder = async (id: string) => {
     if (!db) return;
-    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', id)); } catch (e) {}
+    try { await deleteDoc(doc(db, 'users', user.uid, 'archives', id)); } catch (e) {}
     fetchOrderBook();
   };
 
@@ -373,9 +373,10 @@ function useEspressoAI() {
       setStatus('pulling');
       try {
         const chatHistory = messages.slice(-20).map(m => `${m.role}: ${m.content}`).join('\n');
+        const idToken = await user.getIdToken();
         const summaryRes = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({
             messages: [{
               role: 'user',
@@ -392,12 +393,12 @@ function useEspressoAI() {
         } catch (parseError) {}
 
         if (activeOrderId) {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', activeOrderId), {
+          await updateDoc(doc(db, 'users', user.uid, 'archives', activeOrderId), {
             title, context: parsedSummary.summary, checkpoint: parsedSummary.checkpoint, nextSteps: parsedSummary.nextSteps, updatedAt: serverTimestamp(),
           });
           setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Updated '${title}'.` }]);
         } else {
-          const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'archives'), {
+          const ref = await addDoc(collection(db, 'users', user.uid, 'archives'), {
             title, context: parsedSummary.summary, checkpoint: parsedSummary.checkpoint, nextSteps: parsedSummary.nextSteps, createdAt: serverTimestamp(), status: 'order',
           });
           setActiveOrderId(ref.id);
@@ -458,9 +459,11 @@ function useEspressoAI() {
         return { role: m.role, content: finalContent };
       });
 
+      const idToken = user ? await user.getIdToken() : '';
+      if (!idToken) throw new Error('Authentication required');
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ messages: apiMessages, activeDocument, workspace: workspaceContent }),
       });
       const data = await res.json();
