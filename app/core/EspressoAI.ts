@@ -45,7 +45,7 @@ const ALERT_RE = /\n\n\[(?:NEURAL_NODE_SAVED|SYSTEM_ALERT)[^\]]*\](?::[^\n]*)?/g
 
 // ---------- Helpers ----------
 
-const memoryDocRef = () => doc(db, 'espresso_core', 'B');
+const memoryDocRef = (uid: string) => doc(db, 'users', uid, 'profile', 'memory');
 
 function normalizeMemory(raw: any): Memory {
   const m = raw && typeof raw === 'object' ? raw : {};
@@ -115,16 +115,19 @@ export function useEspressoAI() {
     const local = readLocal();
     memoryRef.current = { ...local, active_document: keepDoc };
 
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
     try {
-      const snap = await withTimeout(getDoc(memoryDocRef()), CLOUD_TIMEOUT_MS);
+      const snap = await withTimeout(getDoc(memoryDocRef(uid)), CLOUD_TIMEOUT_MS);
       if (snap.exists()) {
         const cloud = normalizeMemory(snap.data().memory);
         writeLocal(cloud);
         memoryRef.current = { ...cloud, active_document: keepDoc };
       } else {
         await withTimeout(
-          setDoc(memoryDocRef(), {
-            owner: 'B',
+          setDoc(memoryDocRef(uid), {
+            ownerUid: uid,
             identity: IDENTITY,
             memory: { ...local, active_document: null },
             lastSync: serverTimestamp(),
