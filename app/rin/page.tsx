@@ -17,6 +17,9 @@ export default function RinPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [characterExpression, setCharacterExpression] = useState("neutral");
+  const [manualExpression, setManualExpression] = useState("");
+
   const conversationEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -101,6 +104,15 @@ export default function RinPage() {
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
+      try {
+        const stateResponse = await fetch("/api/rin/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ userText: text, replyText: data.text, manualExpression: manualExpression || null }),
+        });
+        const stateData = await stateResponse.json();
+        if (stateResponse.ok && typeof stateData.state?.expression === "string") setCharacterExpression(stateData.state.expression);
+      } catch { /* Character state is an enhancement; it must not interrupt conversation. */ }
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Message could not be sent.");
       setDraft((current) => current || text);
@@ -119,6 +131,8 @@ export default function RinPage() {
       setUnlocked(false);
       setPin("");
       setMessages([]);
+      setCharacterExpression("neutral");
+      setManualExpression("");
       setLocking(false);
     }
   }
@@ -162,10 +176,35 @@ export default function RinPage() {
                   <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-500">Your companion</p>
                   <h1 className="mt-1 text-2xl font-light tracking-tight sm:text-3xl">Rin</h1>
                 </div>
-                <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.15em] text-emerald-300/80">Private session</span>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="rin-expression" className="sr-only">Character expression</label>
+                  <select id="rin-expression" value={manualExpression} onChange={async (event) => {
+                    const value = event.target.value;
+                    setManualExpression(value);
+                    if (!user) return;
+                    try {
+                      const token = await user.getIdToken();
+                      const response = await fetch("/api/rin/state", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                        body: JSON.stringify({ manualExpression: value || null }),
+                      });
+                      const data = await response.json();
+                      if (response.ok) setCharacterExpression(data.state.expression);
+                    } catch { /* Keep the current expression if the state request fails. */ }
+                  }} className="max-w-[118px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">
+                    <option value="">Auto expression</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="warm">Warm</option>
+                    <option value="thoughtful">Thoughtful</option>
+                    <option value="concerned">Concerned</option>
+                    <option value="playful">Playful</option>
+                  </select>
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.15em] text-emerald-300/80">Private</span>
+                </div>
               </div>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[13%] flex items-end justify-center overflow-hidden">
-                <img src="/rin/rin-default.svg" alt="Illustrated portrait of Rin, with long dark hair, a light front streak and round gold glasses" className="h-full w-full select-none object-contain object-bottom opacity-95" />
+                <img src="/rin/rin-default.svg" alt="Illustrated portrait of Rin, with long dark hair, a light front streak and round gold glasses" data-expression={characterExpression} className="h-full w-full select-none object-contain object-bottom opacity-95" />
               </div>
               <div className="relative z-10 mt-auto bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-5 pb-5 pt-24 sm:px-7 sm:pb-7">
                 <p className="max-w-md text-sm font-light leading-relaxed text-zinc-300 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
