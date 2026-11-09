@@ -60,7 +60,7 @@ export async function GET(req: Request) {
   const verified = await requireFirebaseUser(req);
   if (verified.error) return verified.error;
   if (!verifyRinSession(req, verified.user.uid)) return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });
-  const token = (req.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const memory = await readMemory(verified.user.uid, token);
   return NextResponse.json({ messages: memory.history });
 }
