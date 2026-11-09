@@ -8,7 +8,7 @@ export async function requireFirebaseUser(req: Request): Promise<
   | { user?: never; error: NextResponse }
 > {
   const authorization = req.headers.get("authorization") || "";
-  const match = authorization.match(/^Bearer\\s+(.+)$/i);
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match) {
     return { error: NextResponse.json({ error: "Authentication required." }, { status: 401 }) };
   }
