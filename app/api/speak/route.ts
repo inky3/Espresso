@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
+import { requireFirebaseUser } from '@/lib/server/auth';
 
 export async function POST(req: Request) {
+  const verified = await requireFirebaseUser(req);
+  if (verified.error) return verified.error;
   try {
     const { messages } = await req.json();
-    const lastUserMessage = messages[messages.length - 1].content;
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 30) {
+      return NextResponse.json({ error: 'Invalid messages payload.' }, { status: 400 });
+    }
+    const lastUserMessage = messages[messages.length - 1]?.content;
+    if (typeof lastUserMessage !== 'string' || lastUserMessage.length > 12000) {
+      return NextResponse.json({ error: 'Invalid message content.' }, { status: 400 });
+    }
     
     // 1. HELPER: Fetch with Timeout (10s for stability)
     const fetchWithTimeout = async (url: string, options: any, timeout = 10000) => {

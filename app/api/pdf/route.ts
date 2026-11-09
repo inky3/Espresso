@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { extractText, getDocumentProxy } from 'unpdf';
+import { requireFirebaseUser } from '@/lib/server/auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -8,7 +9,8 @@ const MAX_BYTES = 4 * 1024 * 1024; // stay under Vercel's request body limit
 const MAX_CHARS = 60000; // protect the model's context window
 
 export async function POST(req: Request) {
-  // TODO: add authentication + rate limiting before this goes public
+  const verified = await requireFirebaseUser(req);
+  if (verified.error) return verified.error;
 
   let formData: FormData;
   try {

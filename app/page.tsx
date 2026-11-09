@@ -15,7 +15,23 @@ import { auth, db } from '@/lib/firebase';
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-const appId = 'espresso-terminal'; 
+const appId = 'espresso-terminal';
+
+async function getReadyFirebaseIdToken(timeoutMs = 12000): Promise<string> {
+  if (auth.currentUser) return auth.currentUser.getIdToken();
+  return new Promise((resolve, reject) => {
+    let unsubscribe = () => {};
+    const timeout = setTimeout(() => { unsubscribe(); reject(new Error('Sign-in is taking too long. Please try again.')); }, timeoutMs);
+    unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) return;
+      clearTimeout(timeout);
+      unsubscribe();
+      try { resolve(await currentUser.getIdToken()); }
+      catch { reject(new Error('Could not refresh your sign-in. Please try again.')); }
+    });
+  });
+}
+ 
 
 type PanelKey = 'display' | 'whiteboard' | 'orderbook' | null;
 
@@ -243,11 +259,13 @@ function useDualStatus(user: User | null) {
   useEffect(() => {
     const pingDb = async () => {
       if (!navigator.onLine) { setDbStatus('error'); return; }
+      if (!user) { setDbStatus('checking'); return; }
       try {
         setDbStatus('checking');
+        const token = await user.getIdToken();
         const res = await fetch(
-          'https://firestore.googleapis.com/v1/projects/espresso-11e63/databases/(default)/documents/artifacts/espresso-terminal/memory/trace',
-          { cache: 'no-store', signal: AbortSignal.timeout(5000) }
+          `https://firestore.googleapis.com/v1/projects/espresso-11e63/databases/(default)/documents/users/${user.uid}/memory/trace`,
+          { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(5000) }
         );
         setDbStatus(res.ok || res.status === 404 ? 'connected' : 'error');
       } catch {
@@ -257,7 +275,7 @@ function useDualStatus(user: User | null) {
     pingDb();
     const interval = setInterval(pingDb, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   return { netStatus, dbStatus };
 }
@@ -312,7 +330,7 @@ function useEspressoAI() {
   const fetchOrderBook = async () => {
     if (!user || !db) return;
     try {
-      const snap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'archives'));
+      const snap = await getDocs(collection(db, 'users', user.uid, 'archives'));
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       items.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setOrderBookItems(items);
@@ -320,16 +338,40 @@ function useEspressoAI() {
   };
 
   const deleteOrder = async (id: string) => {
-    if (!db) return;
-    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', id)); } catch (e) {}
-    fetchOrderBook();
+    if (!db || !user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'archives', id));
+      await fetchOrderBook();
+    } catch (e) {
+      console.error('Failed to delete order:', e);
+    }
   };
 
   const parseAndAttachFile = useCallback(async (file: File): Promise<{ name: string; text: string } | null> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       if (file.type.startsWith('image/')) {
-        reader.onload = (e) => resolve({ name: file.name, text: `[IMAGE_BASE64:${file.type}]:${(e.target?.result as string)}` });
+        reader.onload = async (e) => {
+          try {
+            const bitmap = await createImageBitmap(file);
+            const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Canvas unavailable');
+            context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            bitmap.close();
+            const blob = await new Promise<Blob>((resolveBlob, rejectBlob) => canvas.toBlob((value) => value ? resolveBlob(value) : rejectBlob(new Error('Compression failed')), 'image/jpeg', 0.78));
+            const compressedReader = new FileReader();
+            compressedReader.onload = (event) => resolve({ name: file.name, text: `[IMAGE_BASE64:${blob.type}]:${event.target?.result as string}` });
+            compressedReader.onerror = () => resolve(null);
+            compressedReader.readAsDataURL(blob);
+          } catch {
+            const dataUrl = e.target?.result as string;
+            resolve(dataUrl && dataUrl.length <= 3500000 ? { name: file.name, text: `[IMAGE_BASE64:${file.type}]:${dataUrl}` } : null);
+          }
+        };
         reader.readAsDataURL(file);
       } else {
         reader.onload = (e) => resolve({ name: file.name, text: (e.target?.result as string).substring(0, 30000) });
@@ -373,9 +415,10 @@ function useEspressoAI() {
       setStatus('pulling');
       try {
         const chatHistory = messages.slice(-20).map(m => `${m.role}: ${m.content}`).join('\n');
+        const idToken = await user.getIdToken();
         const summaryRes = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({
             messages: [{
               role: 'user',
@@ -392,12 +435,12 @@ function useEspressoAI() {
         } catch (parseError) {}
 
         if (activeOrderId) {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'archives', activeOrderId), {
+          await updateDoc(doc(db, 'users', user.uid, 'archives', activeOrderId), {
             title, context: parsedSummary.summary, checkpoint: parsedSummary.checkpoint, nextSteps: parsedSummary.nextSteps, updatedAt: serverTimestamp(),
           });
           setMessages(prev => [...prev, { role: 'assistant', content: `**[SYSTEM]** Updated '${title}'.` }]);
         } else {
-          const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'archives'), {
+          const ref = await addDoc(collection(db, 'users', user.uid, 'archives'), {
             title, context: parsedSummary.summary, checkpoint: parsedSummary.checkpoint, nextSteps: parsedSummary.nextSteps, createdAt: serverTimestamp(), status: 'order',
           });
           setActiveOrderId(ref.id);
@@ -458,12 +501,15 @@ function useEspressoAI() {
         return { role: m.role, content: finalContent };
       });
 
+      const idToken = await getReadyFirebaseIdToken();
+      if (!idToken) throw new Error('Authentication required');
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, activeDocument, workspace: workspaceContent }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ messages: apiMessages.slice(-20), activeDocument, workspace: workspaceContent }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Chat request failed (' + res.status + ').');
       const replyText = data.text;
 
       setMessages(prev => [...prev, { role: 'assistant', content: replyText, timestamp: Date.now() }]);
@@ -480,8 +526,11 @@ function useEspressoAI() {
       } else if (replyText.includes('```')) {
         openPanelFn('whiteboard');
       }
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: "CRITICAL_ERROR: Link failed." }]);
+      return true;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Please check your connection and try again.';
+      setMessages(prev => [...prev.filter(message => message !== userMsg), { role: 'assistant', content: 'I could not send that message: ' + reason }]);
+      return false;
     } finally {
       setStatus('active');
       setIsTyping(false);
@@ -767,12 +816,19 @@ export default function App() {
     e.target.value = '';
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!inputText.trim() && !pendingFile) || isTyping) return;
-    processCommand(inputText, setOpenPanel, pendingFile);
+    const submittedText = inputText;
+    const submittedFile = pendingFile;
+    // Clear immediately for responsive composer UX; retain a copy for retry on failure.
     setInputText('');
     setPendingFile(null);
+    const sent = await processCommand(submittedText, setOpenPanel, submittedFile);
+    if (sent === false) {
+      setInputText(current => current || submittedText);
+      setPendingFile(current => current || submittedFile);
+    }
   };
 
   const mainLayoutClass = openPanel === 'display' ? 'pt-[50vh] md:pt-0 md:w-1/3 flex-none' : openPanel ? 'flex-1 md:mr-[400px] lg:mr-[450px]' : 'flex-1 mr-0';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { db } from '../../lib/firebase';
+import { auth, db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { findLocation, type Coords } from './geocode';
 
@@ -45,7 +45,7 @@ const ALERT_RE = /\n\n\[(?:NEURAL_NODE_SAVED|SYSTEM_ALERT)[^\]]*\](?::[^\n]*)?/g
 
 // ---------- Helpers ----------
 
-const memoryDocRef = () => doc(db, 'espresso_core', 'B');
+const memoryDocRef = (uid: string) => doc(db, 'users', uid, 'profile', 'memory');
 
 function normalizeMemory(raw: any): Memory {
   const m = raw && typeof raw === 'object' ? raw : {};
@@ -115,16 +115,19 @@ export function useEspressoAI() {
     const local = readLocal();
     memoryRef.current = { ...local, active_document: keepDoc };
 
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
     try {
-      const snap = await withTimeout(getDoc(memoryDocRef()), CLOUD_TIMEOUT_MS);
+      const snap = await withTimeout(getDoc(memoryDocRef(uid)), CLOUD_TIMEOUT_MS);
       if (snap.exists()) {
         const cloud = normalizeMemory(snap.data().memory);
         writeLocal(cloud);
         memoryRef.current = { ...cloud, active_document: keepDoc };
       } else {
         await withTimeout(
-          setDoc(memoryDocRef(), {
-            owner: 'B',
+          setDoc(memoryDocRef(uid), {
+            ownerUid: uid,
             identity: IDENTITY,
             memory: { ...local, active_document: null },
             lastSync: serverTimestamp(),
@@ -164,10 +167,15 @@ export function useEspressoAI() {
     memoryRef.current = next;
     writeLocal(next);
 
+    // Keep local memory available even before authentication is ready.
+    // Cloud memory is always scoped to the currently authenticated user.
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
     // Not awaited on purpose: while offline Firestore keeps the write queued
     // and the promise stays pending, which must never block the chat.
     setDoc(
-      memoryDocRef(),
+      memoryDocRef(uid),
       {
         memory: { [category]: category === 'personal_tags' ? arrayUnion(String(data)) : data },
         lastUpdate: serverTimestamp(),
@@ -199,7 +207,9 @@ export function useEspressoAI() {
         if (file.size > MAX_PDF_BYTES) throw new Error('PDF is larger than 4 MB.');
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch('/api/pdf', { method: 'POST', body: formData });
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('Sign in before uploading a PDF.');
+        const res = await fetch('/api/pdf', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: formData });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Server failed to parse PDF.');
         extractedText = data.text ?? '';
@@ -274,9 +284,11 @@ export function useEspressoAI() {
       const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
 
       try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('Sign in before sending a message.');
         const res = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
           body: JSON.stringify({ messages: history, context: memoryRef.current }),
           signal: controller.signal,
         });
