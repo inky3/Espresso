@@ -1,55 +1,111 @@
-export const RIN_EXPRESSIONS = ["neutral", "warm", "thoughtful", "concerned", "playful"] as const;
-export type RinExpression = typeof RIN_EXPRESSIONS[number];
+import {
+  RIN_ASSET_CATALOG,
+  type RinEnvironmentId,
+  type RinExpressionId,
+  type RinOutfitId,
+  type RinPoseId,
+} from "./character-assets";
+
+export const RIN_EXPRESSIONS = Object.keys(RIN_ASSET_CATALOG.expressions) as RinExpressionId[];
+export const RIN_OUTFITS = Object.keys(RIN_ASSET_CATALOG.outfits) as RinOutfitId[];
+export const RIN_POSES = Object.keys(RIN_ASSET_CATALOG.poses) as RinPoseId[];
+export const RIN_ENVIRONMENTS = Object.keys(RIN_ASSET_CATALOG.environments) as RinEnvironmentId[];
 
 export type RinCharacterState = {
-  expression: RinExpression;
-  pose: "relaxed" | "attentive";
-  outfit: "signature-dark";
-  environment: "private-studio";
+  expression: RinExpressionId;
+  pose: RinPoseId;
+  outfit: RinOutfitId;
+  environment: RinEnvironmentId;
   mode: "automatic" | "manual";
   reason: string;
 };
 
-export function isRinExpression(value: unknown): value is RinExpression {
-  return typeof value === "string" && (RIN_EXPRESSIONS as readonly string[]).includes(value);
+export type RinManualOverrides = {
+  expression?: RinExpressionId;
+  outfit?: RinOutfitId;
+  pose?: RinPoseId;
+  environment?: RinEnvironmentId;
+};
+
+export function isRinExpression(value: unknown): value is RinExpressionId {
+  return typeof value === "string" && value in RIN_ASSET_CATALOG.expressions;
+}
+export function isRinOutfit(value: unknown): value is RinOutfitId {
+  return typeof value === "string" && value in RIN_ASSET_CATALOG.outfits;
+}
+export function isRinPose(value: unknown): value is RinPoseId {
+  return typeof value === "string" && value in RIN_ASSET_CATALOG.poses;
+}
+export function isRinEnvironment(value: unknown): value is RinEnvironmentId {
+  return typeof value === "string" && value in RIN_ASSET_CATALOG.environments;
 }
 
-export function deriveRinState(userText: string, replyText: string, manualExpression?: RinExpression): RinCharacterState {
-  if (manualExpression) {
-    return {
-      expression: manualExpression,
-      pose: "relaxed",
-      outfit: "signature-dark",
-      environment: "private-studio",
-      mode: "manual",
-      reason: "Expression manually selected",
-    };
-  }
-
+export function deriveRinState(
+  userText: string,
+  replyText: string,
+  overrides: RinManualOverrides = {},
+): RinCharacterState {
   const context = (userText + " " + replyText).toLowerCase();
-  let expression: RinExpression = "neutral";
-  let reason = "Default conversational state";
+  let expression: RinExpressionId = "neutral";
+  let expressionReason = "Default conversational state";
 
   if (/(thank|great|glad|excited|love that|haha|lol|ดีใจ|ขอบคุณ|เยี่ยม|555)/i.test(context)) {
-    expression = "warm";
-    reason = "Positive conversational tone";
+    expression = "smile";
+    expressionReason = "Positive conversational tone";
   } else if (/(worr(y|ied)|sad|stress|anxious|afraid|เหนื่อย|เครียด|กังวล|เสียใจ)/i.test(context)) {
     expression = "concerned";
-    reason = "Supportive response to a difficult topic";
+    expressionReason = "Supportive response to a difficult topic";
   } else if (/(why|how|think|consider|plan|explain|compare|ทำไม|อย่างไร|วางแผน|วิเคราะห์)/i.test(context)) {
-    expression = "thoughtful";
-    reason = "Reflective or problem-solving conversation";
+    expression = "thinking";
+    expressionReason = "Reflective or problem-solving conversation";
+  } else if (/(surpris|unexpected|really\?|no way|จริงเหรอ|ตกใจ)/i.test(context)) {
+    expression = "surprised";
+    expressionReason = "Surprising conversational moment";
   } else if (/(tease|joke|funny|playful|แซว|ตลก|ล้อเล่น)/i.test(context)) {
-    expression = "playful";
-    reason = "Lighthearted conversational tone";
+    expression = "curious";
+    expressionReason = "Lighthearted conversational tone";
+  } else if (/(sleep|bed|good night|ง่วง|นอน|ฝันดี)/i.test(context)) {
+    expression = "sleepy";
+    expressionReason = "Late-night or sleepy conversation";
   }
 
+  let outfit: RinOutfitId = "casual";
+  let outfitReason = "Everyday companion mode";
+  if (/(meeting|office|work|study|เรียน|ทำงาน|ประชุม|อ่านหนังสือ)/i.test(context)) {
+    outfit = "work"; outfitReason = "Work or study context";
+  } else if (/(gym|workout|exercise|run|cycle|ออกกำลัง|ฟิตเนส|วิ่ง|ปั่นจักรยาน)/i.test(context)) {
+    outfit = "sporty"; outfitReason = "Active or workout context";
+  } else if (/(sleep|bedtime|good night|ง่วง|เข้านอน|ฝันดี)/i.test(context)) {
+    outfit = "sleepwear"; outfitReason = "Night-time context";
+  } else if (/(home|relax|rest|sofa|พักผ่อน|อยู่บ้าน|ชิล)/i.test(context)) {
+    outfit = "homewear"; outfitReason = "Relaxed at-home context";
+  }
+
+  let pose: RinPoseId = "seated";
+  if (/(work|office|coding|ทำงาน)/i.test(context)) pose = "working";
+  else if (/(study|read|เรียน|อ่าน)/i.test(context)) pose = "studying";
+  else if (/(hello|hi|welcome|สวัสดี|ยินดีต้อนรับ)/i.test(context)) pose = "greeting";
+  else if (/(sleep|bed|good night|นอน|ฝันดี)/i.test(context)) pose = "lying";
+  else if (/(relax|rest|พักผ่อน|ชิล)/i.test(context)) pose = "relaxing";
+  else if (/(talk|chat|conversation|คุย|พูดคุย)/i.test(context)) pose = "leaning";
+
+  let environment: RinEnvironmentId = "workspace";
+  if (/(bedroom|bed|sleep|นอน|ห้องนอน)/i.test(context)) environment = "bedroom";
+  else if (/(cafe|coffee shop|กาแฟ|คาเฟ่)/i.test(context)) environment = "cafe";
+  else if (/(living room|sofa|พักผ่อน|ห้องนั่งเล่น)/i.test(context)) environment = "living";
+
+  const hasOverrides = Object.values(overrides).some(Boolean);
   return {
-    expression,
-    pose: "relaxed",
-    outfit: "signature-dark",
-    environment: "private-studio",
-    mode: "automatic",
-    reason,
+    expression: overrides.expression ?? expression,
+    outfit: overrides.outfit ?? outfit,
+    pose: overrides.pose ?? pose,
+    environment: overrides.environment ?? environment,
+    mode: hasOverrides ? "manual" : "automatic",
+    reason: [
+      overrides.expression ? "Expression manually selected" : expressionReason,
+      overrides.outfit ? "Outfit manually selected" : outfitReason,
+      overrides.pose ? "Pose manually selected" : "",
+      overrides.environment ? "Environment manually selected" : "",
+    ].filter(Boolean).join("; "),
   };
 }
