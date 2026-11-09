@@ -114,7 +114,8 @@ export default function RinPage() {
           body: JSON.stringify({ userText: text, replyText: data.text, manualExpression: manualExpression || null, manualOutfit: manualOutfit || null }),
         });
         const stateData = await stateResponse.json();
-        if (stateResponse.ok && typeof stateData.state?.expression === "string") setCharacterExpression(stateData.state.expression);\n        if (stateResponse.ok && typeof stateData.state?.outfit === "string") setCharacterOutfit(stateData.state.outfit);
+        if (stateResponse.ok && typeof stateData.state?.expression === "string") setCharacterExpression(stateData.state.expression);
+        if (stateResponse.ok && typeof stateData.state?.outfit === "string") setCharacterOutfit(stateData.state.outfit);
       } catch { /* Character state is an enhancement; it must not interrupt conversation. */ }
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Message could not be sent.");
