@@ -38,6 +38,20 @@ export default function RinPage() {
   }, [sending]);
 
   useEffect(() => {
+    const moodMap: Record<string, string> = {
+      neutral: "none",
+      warm: "smile",
+      thoughtful: "thinking",
+      concerned: "concerned",
+      playful: "curious",
+    };
+    characterFrameRef.current?.contentWindow?.postMessage(
+      { type: "rin:mood", mood: moodMap[characterExpression] || "none", duration: 1800 },
+      window.location.origin,
+    );
+  }, [characterExpression]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (current) => {
       if (current) {
         setUser(current);
@@ -197,6 +211,23 @@ export default function RinPage() {
                   title="Rin animated character"
                   className="absolute inset-0 h-full w-full border-0"
                   allow="autoplay"
+                  onLoad={() => {
+                    characterFrameRef.current?.contentWindow?.postMessage(
+                      { type: "rin:talking", active: sending },
+                      window.location.origin,
+                    );
+                    const moodMap: Record<string, string> = {
+                      neutral: "none",
+                      warm: "smile",
+                      thoughtful: "thinking",
+                      concerned: "concerned",
+                      playful: "curious",
+                    };
+                    characterFrameRef.current?.contentWindow?.postMessage(
+                      { type: "rin:mood", mood: moodMap[characterExpression] || "none", duration: 1800 },
+                      window.location.origin,
+                    );
+                  }}
                 />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(10,9,9,0.34)_0%,transparent_34%,transparent_76%,rgba(10,9,9,0.18)_100%),linear-gradient(0deg,rgba(8,8,9,0.78)_0%,transparent_38%,rgba(8,8,9,0.08)_100%)]" />
               </div>
