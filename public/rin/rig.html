@@ -31,7 +31,7 @@ void main(){
   vec2 p=aP; vP=aP;
   vec3 w=texture(uW,(aP-vec2(0.,140.))/vec2(1104.,860.)).rgb;
   float t=smoothstep(1020.,700.,p.y)*smoothstep(470.,600.,p.x)*smoothstep(1104.,980.,p.x);
-  p.y-=(uBreath*3.2+uBodyY*6.0)*t; p.x+=uBodyX*3.*t;
+  p.y-=(uBreath*8.5+uBodyY*22.0)*t; p.x+=uBodyX*3.*t;
   vec2 q=p-PIV; float a=uRoll*w.r; float c=cos(a),s=sin(a);
   p=PIV+vec2(c*q.x-s*q.y,s*q.x+c*q.y);
   vec2 h=aP-HC; float b=clamp(1.-dot(h,h)/(175.*175.),0.,1.);
@@ -194,10 +194,12 @@ function frame(now){
   const talkPulse=rig.talking ? (0.16+0.22*Math.abs(Math.sin(t*9.2))) : 0;
   rig.mouth=damp(rig.mouth,Math.max(M.mouth,talkPulse),24,dt);
   const breath=(Math.sin(t*(rig.mood==='sleepy'?1:1.55))*.5+.5)*calm;
-  const idleY=Math.sin(t*.53)*.05*calm,idleP=Math.sin(t*.71+1)*.04*calm,idleR=Math.sin(t*.43)*.012*calm;
+  const idleY=Math.sin(t*.9)*.11*calm,idleP=Math.sin(t*.71+1)*.08*calm,idleR=Math.sin(t*.63)*.025*calm;
   if(rig.count){
     gl.uniform1f(U.uYaw,rig.yaw+idleY);gl.uniform1f(U.uPitch,rig.pitch+idleP);gl.uniform1f(U.uRoll,(rig.roll+idleR+rig.bump)*.55);
-    gl.uniform1f(U.uBreath,breath);gl.uniform1f(U.uBodyX,rig.yaw*.8);gl.uniform1f(U.uBodyY,rig.talking ? (0.28+0.72*(0.5+0.5*Math.sin(t*8.5))) : 0);gl.uniform1f(U.uSwayL,rig.sL);gl.uniform1f(U.uSwayR,rig.sR);gl.uniform1f(U.uJaw,rig.mouth);
+    gl.uniform1f(U.uBreath,breath);gl.uniform1f(U.uBodyX,rig.yaw*.8);const idleBody=0.22+0.18*(0.5+0.5*Math.sin(t*2.1));
+    const talkBody=0.72+0.55*(0.5+0.5*Math.sin(t*8.5));
+    gl.uniform1f(U.uBodyY,rig.talking ? talkBody : idleBody);gl.uniform1f(U.uSwayL,rig.sL);gl.uniform1f(U.uSwayR,rig.sR);gl.uniform1f(U.uJaw,rig.mouth);
     gl.uniform2f(U.uGaze,.76*rig.gx*4.4+.65*rig.gy*3.2,-.65*rig.gx*4.4+.76*rig.gy*3.2);
     const L=rig.ovBlink!==null?rig.ovBlink:Math.max(bl,rig.lid),R=rig.ovBlink!==null?rig.ovBlink:Math.max(bl,rig.lid,wk);
     gl.uniform1f(U.uBlinkL,L);gl.uniform1f(U.uBlinkR,R);gl.uniform1f(U.uMouth,rig.mouth);gl.uniform1f(U.uSmile,rig.smile);gl.uniform1f(U.uBlush,rig.blush);
