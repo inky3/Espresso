@@ -12,9 +12,18 @@ import { useEffect, useRef, useState } from "react";
 
 export type TimeMode = "auto" | "day" | "night";
 
-type SpriteKey = "casual-neutral" | "casual-happy" | "casual-thinking" | "hoodie-neutral";
+type OutfitArt = "casual" | "hoodie";
+type FaceArt = "neutral" | "happy" | "thinking";
 
-const SPRITES: SpriteKey[] = ["casual-neutral", "casual-happy", "casual-thinking", "hoodie-neutral"];
+/** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
+const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
+  casual: ["neutral", "happy", "thinking"],
+  hoodie: ["neutral"],
+};
+
+const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) =>
+  AVAILABLE_FACES[outfit].map((face) => `${outfit}-${face}`),
+);
 const ROOM = "kitchen";
 
 /** Outfits that have artwork. Everything else falls back to the closest one. */
@@ -30,20 +39,22 @@ export const SUPPORTED_EXPRESSIONS = [
   { id: "thinking", label: "Thinking" },
 ] as const;
 
-function outfitArt(outfit: string): "casual" | "hoodie" {
+function outfitArt(outfit: string): OutfitArt {
   return outfit === "relaxed" || outfit === "homewear" || outfit === "sleepwear" ? "hoodie" : "casual";
 }
 
-function expressionArt(expression: string): "neutral" | "happy" | "thinking" {
+function expressionArt(expression: string): FaceArt {
   if (["happy", "smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
   if (expression === "thinking") return "thinking";
   return "neutral";
 }
 
-export function spriteFor(outfit: string, expression: string): SpriteKey {
+/** Picks the sprite to show, and whether the wanted face is missing for this outfit. */
+export function spriteFor(outfit: string, expression: string) {
   const o = outfitArt(outfit);
-  if (o === "hoodie") return "hoodie-neutral"; // only one hoodie expression exists so far
-  return `casual-${expressionArt(expression)}` as SpriteKey;
+  const wanted = expressionArt(expression);
+  const face = AVAILABLE_FACES[o].includes(wanted) ? wanted : "neutral";
+  return { key: `${o}-${face}`, missingThinking: wanted === "thinking" && face !== "thinking" };
 }
 
 function isNightNow(date = new Date()) {
@@ -96,7 +107,7 @@ export default function RinStage({
   }, [hopSignal, reducedMotion]);
 
   const night = timeMode === "night" || (timeMode === "auto" && autoNight);
-  const active = spriteFor(outfit, expression);
+  const { key: active, missingThinking } = spriteFor(outfit, expression);
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#140c08]" data-room={ROOM} data-time={night ? "night" : "day"} data-sprite={active}>
@@ -116,6 +127,10 @@ export default function RinStage({
       {/* Rin */}
       <div className="pointer-events-none absolute inset-x-0 bottom-[-5%] top-[4%] flex justify-center">
         <div ref={hopRef} className="relative h-full origin-bottom" style={{ aspectRatio: "633 / 1024" }}>
+          <div
+            className="absolute inset-0 origin-bottom transition-transform duration-500 ease-out"
+            style={{ transform: missingThinking && !reducedMotion ? "rotate(-1.2deg)" : "none" }}
+          >
           <div className="rin-breathe absolute inset-0 origin-bottom">
             {SPRITES.map((key) => (
               <img
@@ -134,6 +149,17 @@ export default function RinStage({
                   WebkitMaskImage: "linear-gradient(to top, transparent 0%, black 9%)",
                 }}
               />
+            ))}
+          </div>
+          </div>
+          {/* Fallback "thinking" cue for outfits that have no thinking face yet. */}
+          <div
+            aria-hidden="true"
+            className="absolute right-[6%] top-[3%] flex items-center gap-1 rounded-full border border-white/15 bg-[#120d0a]/75 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-all duration-300"
+            style={{ opacity: missingThinking ? 1 : 0, transform: missingThinking ? "translateY(0) scale(1)" : "translateY(6px) scale(0.9)" }}
+          >
+            {[0, 1, 2].map((dot) => (
+              <span key={dot} className="rin-think-dot h-1.5 w-1.5 rounded-full bg-[#e9dcc6]" style={{ animationDelay: `${dot * 160}ms` }} />
             ))}
           </div>
         </div>
