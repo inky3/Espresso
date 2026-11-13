@@ -40,3 +40,12 @@ body {
   transform: scale(1.12);
 }
 
+
+/* Rin stage: gentle idle breathing (sprite only; the room never moves). */
+@keyframes rin-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.004, 1.009); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rin-breathe { animation: rin-breathe 4.2s ease-in-out infinite; }
+}
