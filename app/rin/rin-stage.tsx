@@ -12,13 +12,14 @@ import { useEffect, useRef, useState } from "react";
 
 export type TimeMode = "auto" | "day" | "night";
 
-type OutfitArt = "casual" | "hoodie";
+type OutfitArt = "casual" | "hoodie" | "shirt";
 type FaceArt = "neutral" | "happy" | "thinking";
 
 /** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
 const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   casual: ["neutral", "happy", "thinking"],
   hoodie: ["neutral"],
+  shirt: ["neutral", "happy", "thinking"],
 };
 
 const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) =>
@@ -30,6 +31,7 @@ const ROOM = "kitchen";
 export const SUPPORTED_OUTFITS = [
   { id: "casual", label: "Casual" },
   { id: "relaxed", label: "Hoodie" },
+  { id: "homewear", label: "Oversized shirt" },
 ] as const;
 
 /** Expressions that have artwork (casual outfit). */
@@ -40,7 +42,9 @@ export const SUPPORTED_EXPRESSIONS = [
 ] as const;
 
 function outfitArt(outfit: string): OutfitArt {
-  return outfit === "relaxed" || outfit === "homewear" || outfit === "sleepwear" ? "hoodie" : "casual";
+  if (outfit === "relaxed") return "hoodie";
+  if (outfit === "homewear" || outfit === "sleepwear") return "shirt";
+  return "casual";
 }
 
 function expressionArt(expression: string): FaceArt {
