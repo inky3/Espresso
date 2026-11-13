@@ -140,6 +140,7 @@ export default function RinPage() {
             outfit: characterOutfit,
             room: ROOM,
             time: timeMode === "auto" ? (isNightAt() ? "night" : "day") : timeMode,
+            outfitLocked: Boolean(manualOutfit),
           },
         }),
       });
@@ -147,6 +148,14 @@ export default function RinPage() {
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
+      // Rin chooses her own outfit and face; a manual outfit only changes if she was asked to.
+      const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
+      const chosenExpression = typeof data.expression === "string" ? data.expression : null;
+      if (chosenOutfit) {
+        setCharacterOutfit(chosenOutfit);
+        if (manualOutfit) setManualOutfit(chosenOutfit);
+      }
+      if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
       speak(data.text);
       try {
         const stateResponse = await fetch("/api/rin/state", {
@@ -157,12 +166,9 @@ export default function RinPage() {
         const stateData = await stateResponse.json();
         if (stateResponse.ok) {
           const nextExpression = stateData.state?.expression;
-          const nextOutfit = stateData.state?.outfit;
-          if (typeof nextExpression === "string") {
+          // Fallback face from the keyword heuristic, only when Rin didn't pick one.
+          if (typeof nextExpression === "string" && !chosenExpression) {
             setCharacterExpression(nextExpression);
-          }
-          if (typeof nextOutfit === "string") {
-            setCharacterOutfit(nextOutfit);
           }
         }
       } catch { /* Character state is an enhancement; it must not interrupt conversation. */ }

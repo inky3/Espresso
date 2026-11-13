@@ -30,10 +30,25 @@ export function isNightAt(date = new Date()) {
   return minutes < 6 * 60 || minutes >= 17 * 60 + 30;
 }
 
+/** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
+export const WARDROBE = ["casual", "relaxed", "homewear"] as const;
+export type WardrobeId = (typeof WARDROBE)[number];
+
+/** Faces Rin can ask for. The stage maps them to the closest existing art. */
+export const EXPRESSION_IDS = [
+  "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "annoyed", "sleepy",
+] as const;
+
+const WARDROBE_NOTES: Record<WardrobeId, string> = {
+  casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
+  relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
+  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (lazy mornings, late nights at home, getting ready for bed)`,
+};
+
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
 export function describeScene(scene: unknown): string | null {
   if (!scene || typeof scene !== "object") return null;
-  const { outfit, room, time } = scene as Record<string, unknown>;
+  const { outfit, room, time, outfitLocked } = scene as Record<string, unknown>;
   const lines: string[] = [];
   if (typeof outfit === "string" && outfit.length <= 32) {
     lines.push(`You are wearing ${OUTFIT_DESCRIPTIONS[outfitArt(outfit)]}.`);
@@ -44,5 +59,31 @@ export function describeScene(scene: unknown): string | null {
   if (time === "day" || time === "night") {
     lines.push(time === "day" ? "It is daytime, with soft sunlight coming in." : "It is night, and the room is lit by warm lamps.");
   }
-  return lines.length ? lines.join(" ") : null;
+  if (!lines.length) return null;
+  const wardrobe = WARDROBE.map((id) => `- ${id}: ${WARDROBE_NOTES[id]}`).join("\n");
+  return `${lines.join(" ")}
+
+YOUR WARDROBE (you change clothes yourself):
+${wardrobe}
+${outfitLocked === true
+    ? "The user picked your current outfit themselves. Keep it unless they ask you to change."
+    : "Change outfit only when it genuinely fits the moment (getting cozy, late at night, relaxing, starting the day) or when the user asks. Do not change often; most replies keep the current outfit."}
+To change, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
+You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.`;
+}
+
+/** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */
+export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string } {
+  let outfit: WardrobeId | undefined;
+  let expression: string | undefined;
+  const text = reply
+    .replace(/\[\[\s*(outfit|expression)\s*:\s*([a-z_-]+)\s*\]\]/gi, (_, kind: string, id: string) => {
+      const value = id.toLowerCase();
+      if (kind.toLowerCase() === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
+      if (kind.toLowerCase() === "expression" && (EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
+      return "";
+    })
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { text, outfit, expression };
 }

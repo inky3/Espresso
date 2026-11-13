@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { describeScene } from "@/lib/rin/scene";
+import { describeScene, parseDirectives } from "@/lib/rin/scene";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
 import { requireFirebaseUser } from "@/lib/server/auth";
 import { verifyRinSession } from "@/lib/server/rin-session";
@@ -124,8 +124,9 @@ Mention it naturally only when it is relevant, for example if the user asks what
     }
 
     const result = await response.json();
-    const reply = result.choices?.[0]?.message?.content;
-    if (typeof reply !== "string" || !reply.trim()) {
+    const rawReply = result.choices?.[0]?.message?.content;
+    const { text: reply, outfit, expression } = parseDirectives(typeof rawReply === "string" ? rawReply : "");
+    if (!reply) {
       return NextResponse.json({ error: "Rin returned an empty response. Please try again." }, { status: 502 });
     }
 
@@ -135,7 +136,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
     const history = [...memory.history, ...(lastUserMessage ? [{ role: "user" as const, content: lastUserMessage.content }] : []), { role: "assistant" as const, content: reply }].slice(-40);
     after(async () => persistMemory(verified.user.uid, token, memory.summary, trace, history));
 
-    return NextResponse.json({ text: reply });
+    return NextResponse.json({ text: reply, ...(outfit ? { outfit } : {}), ...(expression ? { expression } : {}) });
   } catch (error) {
     console.error("[RIN CHAT ERROR]", error);
     return NextResponse.json({ error: "Rin's reply couldn't be completed. Please try again." }, { status: 500 });
