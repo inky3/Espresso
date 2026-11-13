@@ -25,7 +25,7 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
 const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
-  casual: [],
+  casual: ["chin", "cheer", "cheeks", "hands", "wave"],
   hoodie: [],
   shirt: [],
 };
