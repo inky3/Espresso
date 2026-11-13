@@ -67,6 +67,69 @@ export default function RinPage() {
     poseTimerRef.current = setTimeout(() => setPose(null), 4500);
   };
 
+  const greetedRef = useRef(false);
+
+  const currentScene = () => ({
+    outfit: characterOutfit,
+    room: ROOM,
+    time: timeMode === "auto" ? (isNightAt() ? "night" : "day") : timeMode,
+    outfitLocked: Boolean(manualOutfit),
+  });
+
+  // Applies what Rin chose for herself (outfit, face, pose). Returns the chosen face, if any.
+  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown }) => {
+    const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
+    const chosenExpression = typeof data.expression === "string" ? data.expression : null;
+    if (chosenOutfit) {
+      setCharacterOutfit(chosenOutfit);
+      if (manualOutfit) setManualOutfit(chosenOutfit);
+    }
+    if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
+    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose)) strikePose(data.pose as PoseId);
+    return chosenExpression;
+  };
+
+  // Loads the conversation, then lets Rin speak first if the user has been away for a while.
+  const openSpace = async (current: User) => {
+    const token = await current.getIdToken();
+    const historyResponse = await fetch("/api/rin/chat", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+    if (historyResponse.ok) {
+      const historyData = await historyResponse.json();
+      if (Array.isArray(historyData.messages)) setMessages(historyData.messages.filter((item: { role?: unknown; content?: unknown } | null) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string"));
+    }
+    if (greetedRef.current) return;
+    greetedRef.current = true;
+    setSending(true);
+    try {
+      const now = new Date();
+      const response = await fetch("/api/rin/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({
+          greeting: true,
+          scene: currentScene(),
+          localTime: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+          weekday: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][now.getDay()],
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && typeof data.text === "string" && data.text.trim()) {
+        setMessages((existing) => [...existing, { role: "assistant", content: data.text }]);
+        applyRinChoices(data);
+        speak(data.text);
+      }
+    } catch { /* A missed greeting must never block the conversation. */ }
+    finally {
+      setSending(false);
+    }
+  };
+
+  const openSpaceRef = useRef(openSpace);
+  useEffect(() => {
+    openSpaceRef.current = openSpace;
+  });
+
+
   // A small greeting hop when the private space opens.
   useEffect(() => {
     if (!unlocked) return;
@@ -86,13 +149,7 @@ export default function RinPage() {
           });
           const data = await response.json();
           setUnlocked(Boolean(data.unlocked));
-          if (data.unlocked) {
-            const historyResponse = await fetch("/api/rin/chat", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
-            if (historyResponse.ok) {
-              const historyData = await historyResponse.json();
-              if (Array.isArray(historyData.messages)) setMessages(historyData.messages.filter((item: any) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string"));
-            }
-          }
+          if (data.unlocked) void openSpaceRef.current(current);
         } catch {
           setUnlocked(false);
         }
@@ -125,6 +182,7 @@ export default function RinPage() {
       if (!response.ok) throw new Error(data.error || "Unable to unlock Rin.");
       setUnlocked(true);
       setPin("");
+      void openSpace(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to unlock Rin.");
     } finally {
@@ -148,12 +206,7 @@ export default function RinPage() {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
           messages: nextMessages.slice(-20),
-          scene: {
-            outfit: characterOutfit,
-            room: ROOM,
-            time: timeMode === "auto" ? (isNightAt() ? "night" : "day") : timeMode,
-            outfitLocked: Boolean(manualOutfit),
-          },
+          scene: currentScene(),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -161,14 +214,7 @@ export default function RinPage() {
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
       // Rin chooses her own outfit and face; a manual outfit only changes if she was asked to.
-      const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
-      const chosenExpression = typeof data.expression === "string" ? data.expression : null;
-      if (chosenOutfit) {
-        setCharacterOutfit(chosenOutfit);
-        if (manualOutfit) setManualOutfit(chosenOutfit);
-      }
-      if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
-      if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose)) strikePose(data.pose as PoseId);
+      const chosenExpression = applyRinChoices(data);
       speak(data.text);
       try {
         const stateResponse = await fetch("/api/rin/state", {
@@ -203,6 +249,7 @@ export default function RinPage() {
       setUnlocked(false);
       setPin("");
       setMessages([]);
+      greetedRef.current = false;
       setCharacterExpression("neutral");
       setManualExpression("");
       setLocking(false);

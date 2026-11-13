@@ -19,14 +19,14 @@ type FaceArt = "neutral" | "happy" | "thinking";
 /** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
 const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   casual: ["neutral", "happy", "thinking"],
-  hoodie: ["neutral"],
+  hoodie: ["neutral", "happy", "thinking"],
   shirt: ["neutral", "happy", "thinking"],
 };
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
 const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
   casual: ["chin", "cheer", "cheeks", "hands", "wave"],
-  hoodie: [],
+  hoodie: ["chin", "cheer", "cheeks", "wave"],
   shirt: [],
 };
 
