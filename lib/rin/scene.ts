@@ -39,6 +39,18 @@ export const EXPRESSION_IDS = [
   "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "annoyed", "sleepy",
 ] as const;
 
+/** Strong-moment poses Rin can strike briefly. */
+export const POSE_IDS = ["chin", "cheer", "cheeks", "hands", "wave"] as const;
+export type PoseId = (typeof POSE_IDS)[number];
+
+const POSE_NOTES: Record<PoseId, string> = {
+  chin: "hand on chin, for thinking hard about a tricky question",
+  cheer: "hands clasped near your chest, for real excitement or delight",
+  cheeks: "hands on your cheeks, for being very flustered or embarrassed",
+  hands: "hands held together at your chest, for real worry or concern",
+  wave: "a small wave, for hello or goodbye",
+};
+
 const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
@@ -69,21 +81,25 @@ ${outfitLocked === true
     ? "The user picked your current outfit themselves. Keep it unless they ask you to change."
     : "Change outfit only when it genuinely fits the moment (getting cozy, late at night, relaxing, starting the day) or when the user asks. Do not change often; most replies keep the current outfit."}
 To change, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
-You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.`;
+You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.
+For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Poses:
+${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
 }
 
 /** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */
-export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string } {
+export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string; pose?: PoseId } {
   let outfit: WardrobeId | undefined;
   let expression: string | undefined;
+  let pose: PoseId | undefined;
   const text = reply
-    .replace(/\[\[\s*(outfit|expression)\s*:\s*([a-z_-]+)\s*\]\]/gi, (_, kind: string, id: string) => {
+    .replace(/\[\[\s*(outfit|expression|pose)\s*:\s*([a-z_-]+)\s*\]\]/gi, (_, kind: string, id: string) => {
       const value = id.toLowerCase();
+      if (kind.toLowerCase() === "pose" && (POSE_IDS as readonly string[]).includes(value)) pose = value as PoseId;
       if (kind.toLowerCase() === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
       if (kind.toLowerCase() === "expression" && (EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
       return "";
     })
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  return { text, outfit, expression };
+  return { text, outfit, expression, pose };
 }

@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import RinStage, { ROOM, SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
-import { isNightAt } from "@/lib/rin/scene";
+import { isNightAt, POSE_IDS, type PoseId } from "@/lib/rin/scene";
 
 export default function RinPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -26,6 +26,8 @@ export default function RinPage() {
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState<TimeMode>("auto");
   const [hopSignal, setHopSignal] = useState({ id: 0, strength: 1 });
+  const [pose, setPose] = useState<PoseId | null>(null);
+  const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const hopTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -53,7 +55,17 @@ export default function RinPage() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, sending]);
 
-  useEffect(() => () => hopTimersRef.current.forEach(clearTimeout), []);
+  useEffect(() => () => {
+    hopTimersRef.current.forEach(clearTimeout);
+    if (poseTimerRef.current) clearTimeout(poseTimerRef.current);
+  }, []);
+
+  // A strong pose is a moment: show it briefly, then relax back to the normal stance.
+  const strikePose = (next: PoseId) => {
+    if (poseTimerRef.current) clearTimeout(poseTimerRef.current);
+    setPose(next);
+    poseTimerRef.current = setTimeout(() => setPose(null), 4500);
+  };
 
   // A small greeting hop when the private space opens.
   useEffect(() => {
@@ -156,6 +168,7 @@ export default function RinPage() {
         if (manualOutfit) setManualOutfit(chosenOutfit);
       }
       if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
+      if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose)) strikePose(data.pose as PoseId);
       speak(data.text);
       try {
         const stateResponse = await fetch("/api/rin/state", {
@@ -233,6 +246,7 @@ export default function RinPage() {
                 <RinStage
                   outfit={characterOutfit}
                   expression={sending ? "thinking" : characterExpression}
+                  pose={sending ? null : pose}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
                 />
