@@ -18,7 +18,7 @@ type FaceArt = "neutral" | "happy" | "thinking";
 /** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
 const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   casual: ["neutral", "happy", "thinking"],
-  hoodie: ["neutral"],
+  hoodie: ["neutral", "happy", "thinking"],
 };
 
 const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) =>
