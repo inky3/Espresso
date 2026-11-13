@@ -31,7 +31,7 @@ void main(){
   vec2 p=aP; vP=aP;
   vec3 w=texture(uW,(aP-vec2(0.,140.))/vec2(1104.,860.)).rgb;
   float t=smoothstep(1020.,700.,p.y)*smoothstep(470.,600.,p.x)*smoothstep(1104.,980.,p.x);
-  p.y-=(uBreath*8.5+uBodyY*22.0)*t; p.x+=uBodyX*3.*t;
+  p.y-=(uBreath*3.6+uBodyY*3.0)*t; p.x+=uBodyX*3.*t;
   vec2 q=p-PIV; float a=uRoll*w.r; float c=cos(a),s=sin(a);
   p=PIV+vec2(c*q.x-s*q.y,s*q.x+c*q.y);
   vec2 h=aP-HC; float b=clamp(1.-dot(h,h)/(175.*175.),0.,1.);
@@ -128,8 +128,10 @@ function tex(unit,img){const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+u
 function resize(){
   const r=stage.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
   cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);gl.viewport(0,0,cv.width,cv.height);
-  const s=Math.min(r.width/1104,r.height/1824), hw=r.width/s/2, hh=r.height/s/2;
-  cam={x:552,y:912,hw,hh,s};
+  const s=Math.max(r.width/1104,r.height/1824), hw=r.width/s/2, hh=r.height/s/2;
+  /* cover the stage; keep her face (~y470) about 30% from the top */
+  const cx=clamp(640,hw,1104-hw), cy=clamp(470+hh*.4,hh,1824-hh);
+  cam={x:cx,y:cy,hw,hh,s};
   gl.uniform4f(U.uCam,cam.x,cam.y,hw,hh);
 }
 async function boot(){
@@ -166,7 +168,7 @@ const MOODS={
   wink:mood({smile:1,blush:.2,roll:-.05})
 };
 const rig={count:0,yaw:0,pitch:0,roll:0,gx:0,gy:0,smile:0,blush:0,lid:0,happy:0,wide:0,narrow:0,mouth:0,glint:0,mood:'none',moodUntil:0,talking:false,
-  blinkT:2,blinkP:-1,wink:0,sL:0,vL:0,sR:0,vR:0,tYaw:0,tPitch:0,lastPtr:-1e9,lookAt:0,lyaw:0,lpitch:0,bump:0,ovBlink:null,nextSmile:performance.now()+6000};
+  blinkT:2,blinkP:-1,syl:0,sylT:0,sylNext:0,beat:0,beatT:0,beatNext:0,nod:0,wink:0,sL:0,vL:0,sR:0,vR:0,tYaw:0,tPitch:0,lastPtr:-1e9,lookAt:0,lyaw:0,lpitch:0,bump:0,ovBlink:null,nextSmile:performance.now()+6000};
 function setMood(m,ms){rig.mood=m;rig.moodUntil=ms===Infinity?Infinity:performance.now()+(ms||2600);if(m==='wink')rig.wink=.62}
 function frame(now){
   const t=now/1000,dt=Math.min((now-(frame.p||now))/1000,.05);frame.p=now;
@@ -191,15 +193,21 @@ function frame(now){
   rig.vL+=(-k*rig.sL-c*rig.vL-hv*3.2+wind*k*.55*calm)*dt;rig.sL=clamp(rig.sL+rig.vL*dt,-1.1,1.1);
   rig.vR+=(-(k*.7)*rig.sR-c*rig.vR-hv*2.7+Math.sin(t*.74+2)*k*.05*calm)*dt;rig.sR=clamp(rig.sR+rig.vR*dt,-1.1,1.1);
   /* talking */
-  const talkPulse=rig.talking ? (0.16+0.22*Math.abs(Math.sin(t*9.2))) : 0;
-  rig.mouth=damp(rig.mouth,Math.max(M.mouth,talkPulse),24,dt);
+  if(rig.talking){
+    /* syllables: irregular open/close, occasional short pauses */
+    if(now>rig.sylNext){rig.sylT=rig.sylT>.08||Math.random()<.12?rnd(0,.05):rnd(.18,.42);rig.sylNext=now+rnd(85,170)+(Math.random()<.08?rnd(180,360):0)}
+    /* emphasis beats: a small nod/lean every so often */
+    if(now>rig.beatNext){rig.beatT=Math.random()<.6?rnd(.4,1):0;rig.beatNext=now+rnd(450,1100)}
+  }else{rig.sylT=0;rig.beatT=0}
+  rig.syl=damp(rig.syl,rig.sylT,22,dt);rig.beat=damp(rig.beat,rig.beatT,5,dt);
+  rig.nod=damp(rig.nod,rig.beat,7,dt);
+  rig.mouth=damp(rig.mouth,Math.max(M.mouth,rig.syl),26,dt);
   const breath=(Math.sin(t*(rig.mood==='sleepy'?1:1.55))*.5+.5)*calm;
-  const idleY=Math.sin(t*.9)*.11*calm,idleP=Math.sin(t*.71+1)*.08*calm,idleR=Math.sin(t*.63)*.025*calm;
+  const idleY=(Math.sin(t*.53)*.05+Math.sin(t*.29+2)*.025)*calm,idleP=(Math.sin(t*.71+1)*.035+rig.nod*.11)*calm,idleR=(Math.sin(t*.43)*.012+rig.nod*.01)*calm;
   if(rig.count){
     gl.uniform1f(U.uYaw,rig.yaw+idleY);gl.uniform1f(U.uPitch,rig.pitch+idleP);gl.uniform1f(U.uRoll,(rig.roll+idleR+rig.bump)*.55);
-    gl.uniform1f(U.uBreath,breath);gl.uniform1f(U.uBodyX,rig.yaw*.8);const idleBody=0.22+0.18*(0.5+0.5*Math.sin(t*2.1));
-    const talkBody=0.72+0.55*(0.5+0.5*Math.sin(t*8.5));
-    gl.uniform1f(U.uBodyY,rig.talking ? talkBody : idleBody);gl.uniform1f(U.uSwayL,rig.sL);gl.uniform1f(U.uSwayR,rig.sR);gl.uniform1f(U.uJaw,rig.mouth);
+    gl.uniform1f(U.uBreath,breath);gl.uniform1f(U.uBodyX,rig.yaw*.8);
+    gl.uniform1f(U.uBodyY,rig.nod*calm);gl.uniform1f(U.uSwayL,rig.sL);gl.uniform1f(U.uSwayR,rig.sR);gl.uniform1f(U.uJaw,rig.mouth);
     gl.uniform2f(U.uGaze,.76*rig.gx*4.4+.65*rig.gy*3.2,-.65*rig.gx*4.4+.76*rig.gy*3.2);
     const L=rig.ovBlink!==null?rig.ovBlink:Math.max(bl,rig.lid),R=rig.ovBlink!==null?rig.ovBlink:Math.max(bl,rig.lid,wk);
     gl.uniform1f(U.uBlinkL,L);gl.uniform1f(U.uBlinkR,R);gl.uniform1f(U.uMouth,rig.mouth);gl.uniform1f(U.uSmile,rig.smile);gl.uniform1f(U.uBlush,rig.blush);

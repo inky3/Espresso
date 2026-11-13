@@ -16,6 +16,7 @@ export default function RinPage() {
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [chatError, setChatError] = useState("");
   const [characterExpression, setCharacterExpression] = useState("neutral");
   const [manualExpression, setManualExpression] = useState("");
@@ -25,30 +26,34 @@ export default function RinPage() {
 
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const characterFrameRef = useRef<HTMLIFrameElement>(null);
+  const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const postToRig = (message: Record<string, unknown>) => {
+    characterFrameRef.current?.contentWindow?.postMessage(message, window.location.origin);
+  };
+  // Rig moods match the canonical expression IDs; "neutral" is the rig's "none".
+  const rigMood = (expression: string) => (expression === "neutral" ? "none" : expression);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, sending]);
 
+  // Talk while the reply is being "spoken", not while waiting for the server.
   useEffect(() => {
-    characterFrameRef.current?.contentWindow?.postMessage(
-      { type: "rin:talking", active: sending },
-      window.location.origin,
-    );
+    postToRig({ type: "rin:talking", active: speaking });
+  }, [speaking]);
+
+  // While waiting for a reply, Rin looks thoughtful.
+  useEffect(() => {
+    if (sending) postToRig({ type: "rin:mood", mood: "thinking", duration: 30000 });
   }, [sending]);
 
+  useEffect(() => () => {
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+  }, []);
+
   useEffect(() => {
-    const moodMap: Record<string, string> = {
-      neutral: "none",
-      warm: "smile",
-      thoughtful: "thinking",
-      concerned: "concerned",
-      playful: "curious",
-    };
-    characterFrameRef.current?.contentWindow?.postMessage(
-      { type: "rin:mood", mood: moodMap[characterExpression] || "none", duration: 1800 },
-      window.location.origin,
-    );
+    postToRig({ type: "rin:mood", mood: rigMood(characterExpression), duration: 6000 });
   }, [characterExpression]);
 
   useEffect(() => {
@@ -129,6 +134,13 @@ export default function RinPage() {
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
+      postToRig({ type: "rin:mood", mood: "none", duration: 0 });
+      if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+      setSpeaking(true);
+      speakingTimerRef.current = setTimeout(
+        () => setSpeaking(false),
+        Math.min(9000, Math.max(1200, data.text.length * 55)),
+      );
       try {
         const stateResponse = await fetch("/api/rin/state", {
           method: "POST",
@@ -209,23 +221,15 @@ export default function RinPage() {
                   ref={characterFrameRef}
                   src="/rin/rig.html"
                   title="Rin animated character"
+                  data-outfit={characterOutfit}
                   className="absolute inset-0 h-full w-full border-0"
                   allow="autoplay"
                   onLoad={() => {
-                    characterFrameRef.current?.contentWindow?.postMessage(
-                      { type: "rin:talking", active: sending },
-                      window.location.origin,
-                    );
-                    const moodMap: Record<string, string> = {
-                      neutral: "none",
-                      warm: "smile",
-                      thoughtful: "thinking",
-                      concerned: "concerned",
-                      playful: "curious",
-                    };
-                    characterFrameRef.current?.contentWindow?.postMessage(
-                      { type: "rin:mood", mood: moodMap[characterExpression] || "none", duration: 1800 },
-                      window.location.origin,
+                    postToRig({ type: "rin:talking", active: speaking });
+                    postToRig(
+                      sending
+                        ? { type: "rin:mood", mood: "thinking", duration: 30000 }
+                        : { type: "rin:mood", mood: rigMood(characterExpression), duration: 6000 },
                     );
                   }}
                 />
@@ -294,12 +298,12 @@ export default function RinPage() {
               </div>
             </section>
 
-            <aside className={`fixed inset-x-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#101013]/[0.98] p-4 shadow-[0_-12px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height] duration-300 lg:static lg:z-auto lg:h-auto lg:min-h-0 lg:rounded-[28px] lg:p-7 lg:shadow-none lg:backdrop-blur-none ${mobileChatOpen ? "h-[68dvh]" : "h-[72px]"}`}>
+            <aside className={`fixed inset-x-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#101013]/[0.98] p-4 shadow-[0_-12px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height] duration-300 lg:static lg:z-auto lg:h-auto lg:max-h-[calc(100dvh-140px)] lg:min-h-0 lg:rounded-[28px] lg:p-7 lg:shadow-none lg:backdrop-blur-none ${mobileChatOpen ? "h-[68dvh]" : "h-[72px]"}`}>
               <button type="button" onClick={() => setMobileChatOpen((open) => !open)} className="flex min-h-8 items-center justify-between text-left lg:pointer-events-none">
                 <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">Conversation <span className="ml-2 text-zinc-600 lg:hidden">{mobileChatOpen ? "Close" : "Open chat"}</span></span>
                 <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#c6a45b]" /><span className="text-zinc-500 lg:hidden">{mobileChatOpen ? "⌄" : "⌃"}</span></span>
               </button>
-              <div className={`${mobileChatOpen ? "flex" : "hidden"} my-5 flex-1 space-y-4 overflow-y-auto pr-1 lg:flex`} aria-live="polite">
+              <div className={`${mobileChatOpen ? "flex" : "hidden"} my-5 min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1 lg:flex`} aria-live="polite">
                 {messages.length === 0 ? (
                   <div className="flex h-full min-h-[180px] flex-col items-center justify-center text-center">
                     <div className="mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#c6a45b]/20 bg-[#c6a45b]/[0.06] text-lg font-light text-[#d5bd88]">R</div>
