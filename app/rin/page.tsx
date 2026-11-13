@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
+import RinStage, { ROOM, SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
+import { isNightAt } from "@/lib/rin/scene";
 
 export default function RinPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -133,7 +134,14 @@ export default function RinPage() {
       const response = await fetch("/api/rin/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ messages: nextMessages.slice(-20) }),
+        body: JSON.stringify({
+          messages: nextMessages.slice(-20),
+          scene: {
+            outfit: characterOutfit,
+            room: ROOM,
+            time: timeMode === "auto" ? (isNightAt() ? "night" : "day") : timeMode,
+          },
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");

@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { describeScene } from "@/lib/rin/scene";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
 import { requireFirebaseUser } from "@/lib/server/auth";
 import { verifyRinSession } from "@/lib/server/rin-session";
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
     }
 
     const memory = await readMemory(verified.user.uid, token);
+    const scene = describeScene(body?.scene);
     const system = `You are Rin, the user's private AI companion inside Espresso.
 You are an adult woman with a calm, observant, warm personality. You can be gently teasing when the moment invites it, but never force intimacy or pretend to have experiences you do not have.
 Speak naturally and directly. Be emotionally attentive without becoming overly agreeable. Offer honest opinions and constructive disagreement when useful. Avoid generic customer-service phrasing and do not call yourself Espresso.
@@ -96,7 +98,10 @@ Remember only useful, non-sensitive preferences and ongoing context. Never claim
 PRIVATE MEMORY SUMMARY:
 ${memory.summary || "No saved personal memory yet."}
 RECENT CONVERSATION NOTES:
-${memory.trace || "This is the beginning of the private conversation."}`;
+${memory.trace || "This is the beginning of the private conversation."}${scene ? `
+CURRENT SCENE (exactly what the user sees on screen right now; treat it as true):
+${scene}
+Mention it naturally only when it is relevant, for example if the user asks what you are wearing or comments on it. Do not describe it unprompted in every reply.` : ""}`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",

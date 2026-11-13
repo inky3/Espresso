@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- layered, pre-optimised sprites need plain <img> stacking */
 
 import { useEffect, useRef, useState } from "react";
+import { isNightAt, outfitArt, type OutfitArt } from "@/lib/rin/scene";
 
 /**
  * Azur Lane-style character stage: a still room (day/night crossfade, softly
@@ -12,7 +13,6 @@ import { useEffect, useRef, useState } from "react";
 
 export type TimeMode = "auto" | "day" | "night";
 
-type OutfitArt = "casual" | "hoodie" | "shirt";
 type FaceArt = "neutral" | "happy" | "thinking";
 
 /** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
@@ -25,7 +25,7 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
 const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) =>
   AVAILABLE_FACES[outfit].map((face) => `${outfit}-${face}`),
 );
-const ROOM = "kitchen";
+export const ROOM = "kitchen";
 
 /** Outfits that have artwork. Everything else falls back to the closest one. */
 export const SUPPORTED_OUTFITS = [
@@ -41,12 +41,6 @@ export const SUPPORTED_EXPRESSIONS = [
   { id: "thinking", label: "Thinking" },
 ] as const;
 
-function outfitArt(outfit: string): OutfitArt {
-  if (outfit === "relaxed") return "hoodie";
-  if (outfit === "homewear" || outfit === "sleepwear") return "shirt";
-  return "casual";
-}
-
 function expressionArt(expression: string): FaceArt {
   if (["happy", "smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
   if (expression === "thinking") return "thinking";
@@ -61,10 +55,7 @@ export function spriteFor(outfit: string, expression: string) {
   return { key: `${o}-${face}`, missingThinking: wanted === "thinking" && face !== "thinking" };
 }
 
-function isNightNow(date = new Date()) {
-  const minutes = date.getHours() * 60 + date.getMinutes();
-  return minutes < 6 * 60 || minutes >= 17 * 60 + 30;
-}
+const isNightNow = () => isNightAt();
 
 export default function RinStage({
   outfit,
