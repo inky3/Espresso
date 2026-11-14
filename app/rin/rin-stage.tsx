@@ -51,6 +51,15 @@ export const SUPPORTED_EXPRESSIONS = [
   { id: "thinking", label: "Thinking" },
 ] as const;
 
+/** Poses, offered in the same menu as faces. Picking one holds it until changed. */
+export const SUPPORTED_POSES = [
+  { id: "chin", label: "Thinking hard" },
+  { id: "cheer", label: "Excited" },
+  { id: "cheeks", label: "Flustered" },
+  { id: "hands", label: "Worried" },
+  { id: "wave", label: "Waving" },
+] as const;
+
 function expressionArt(expression: string): FaceArt {
   if (["happy", "smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
   if (expression === "thinking") return "thinking";

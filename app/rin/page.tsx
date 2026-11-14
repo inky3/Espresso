@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
+import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, SUPPORTED_POSES, type TimeMode } from "./rin-stage";
 import { isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
 
 function RinPage() {
@@ -22,6 +22,7 @@ function RinPage() {
   const [chatError, setChatError] = useState("");
   const [characterExpression, setCharacterExpression] = useState("neutral");
   const [manualExpression, setManualExpression] = useState("");
+  const [manualPose, setManualPose] = useState<PoseId | null>(null);
   const [characterOutfit, setCharacterOutfit] = useState("casual");
   const [manualOutfit, setManualOutfit] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
@@ -257,6 +258,7 @@ function RinPage() {
       greetedRef.current = false;
       setCharacterExpression("neutral");
       setManualExpression("");
+      setManualPose(null);
       setLocking(false);
     }
   }
@@ -299,7 +301,7 @@ function RinPage() {
                   room={room}
                   outfit={characterOutfit}
                   expression={sending ? "thinking" : characterExpression}
-                  pose={sending ? null : pose}
+                  pose={sending ? null : (pose ?? manualPose)}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
                 />
@@ -312,8 +314,14 @@ function RinPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <label htmlFor="rin-expression" className="sr-only">Character expression</label>
-                  <select id="rin-expression" value={manualExpression} onChange={async (event) => {
+                  <select id="rin-expression" value={manualPose ? `pose:${manualPose}` : manualExpression} onChange={async (event) => {
                     const value = event.target.value;
+                    if (value.startsWith("pose:")) {
+                      setManualPose(value.slice(5) as PoseId);
+                      hop(0.7);
+                      return;
+                    }
+                    setManualPose(null);
                     setManualExpression(value);
                     if (!user) return;
                     try {
@@ -329,6 +337,9 @@ function RinPage() {
                   }} className="max-w-[118px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">
                     <option value="">Auto expression</option>
                     {SUPPORTED_EXPRESSIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                    <optgroup label="Poses">
+                      {SUPPORTED_POSES.map((option) => <option key={option.id} value={`pose:${option.id}`}>{option.label}</option>)}
+                    </optgroup>
                   </select>
                   <label htmlFor="rin-outfit" className="sr-only">Character outfit</label>
                   <select id="rin-outfit" value={manualOutfit} onChange={async (event) => {
