@@ -113,6 +113,7 @@ export default function RinStage({
   pose = null,
   hopSignal,
   timeMode,
+  speaking = false,
 }: {
   room?: RoomId;
   outfit: string;
@@ -122,6 +123,8 @@ export default function RinStage({
   /** Increment `id` to make Rin hop; `strength` 0–1 scales the jump. */
   hopSignal: { id: number; strength: number };
   timeMode: TimeMode;
+  /** True while Rin is delivering a text reply; only the character layer moves. */
+  speaking?: boolean;
 }) {
   const hopRef = useRef<HTMLDivElement>(null);
   const [autoNight, setAutoNight] = useState(() => isNightNow());
@@ -202,7 +205,8 @@ export default function RinStage({
       <div className="pointer-events-none absolute inset-x-0 bottom-[-5%] top-[4%] flex justify-center">
         <div ref={hopRef} className="relative h-full origin-bottom" style={{ aspectRatio: "633 / 1024" }}>
           <div className="absolute inset-0 origin-bottom transition-transform duration-500 ease-out" style={{ transform: lightTransform }}>
-            <div className="rin-breathe absolute inset-0 origin-bottom">
+            <div className={`absolute inset-0 origin-bottom ${speaking ? "rin-speaking" : ""}`}>
+              <div className="rin-breathe absolute inset-0 origin-bottom">
               {SPRITES.map((key) => (
                 <img
                   key={key}
@@ -221,6 +225,7 @@ export default function RinStage({
                   }}
                 />
               ))}
+              </div>
             </div>
           </div>
           {/* Fallback "thinking" cue for outfits that have no thinking face yet. */}
