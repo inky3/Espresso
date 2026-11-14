@@ -600,6 +600,7 @@ The implementation history matters because several approaches were tried and rej
 - [x] WebGL2 rig HTML embedded in an iframe.
 - [x] Message bridge for talking and limited mood/expression state.
 - [x] Latest movement tuning committed to the feature branch.
+- [x] Text-response speaking state wired to a reduced-motion-aware character-only animation (duration estimated from reply length; not audio-synchronised).
 
 ### 11.2 Not yet verified or not fully implemented
 
