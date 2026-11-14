@@ -98,7 +98,7 @@ function RinPage() {
       if (manualOutfit) setManualOutfit(chosenOutfit);
     }
     if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
-    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose)) strikePose(data.pose as PoseId);
+    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose) && !manualPose) strikePose(data.pose as PoseId);
     if (typeof data.room === "string" && ROOMS.some((r) => r.id === data.room)) setRoom(data.room as RoomId);
     return chosenExpression;
   };
