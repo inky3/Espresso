@@ -114,7 +114,7 @@ export function spriteFor(outfit: string, expression: string, pose?: PoseId | nu
   const outfitFallbacks: Partial<Record<FaceArt, FaceArt>> = o === "casual"
     ? { frustrated: "angry", "unintended-teasing": "teasing-3" }
     : o === "shirt"
-      ? { "flustered-teasing": "teasing" }
+      ? { "flustered-teasing": "teasing", "teasing-1": "teasing" }
       : {};
   const candidates = [wanted, outfitFallbacks[wanted], "neutral"].filter(Boolean) as FaceArt[];
   const face = candidates.find((candidate) => AVAILABLE_FACES[o].includes(candidate)) ?? "neutral";
