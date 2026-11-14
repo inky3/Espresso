@@ -5,6 +5,7 @@ import {
   type RinOutfitId,
   type RinPoseId,
 } from "./character-assets";
+import type { PoseId as RinReactionPoseId } from "./scene";
 
 export const RIN_EXPRESSIONS = Object.keys(RIN_ASSET_CATALOG.expressions) as RinExpressionId[];
 export const RIN_OUTFITS = Object.keys(RIN_ASSET_CATALOG.outfits) as RinOutfitId[];
@@ -14,6 +15,7 @@ export const RIN_ENVIRONMENTS = Object.keys(RIN_ASSET_CATALOG.environments) as R
 export type RinCharacterState = {
   expression: RinExpressionId;
   pose: RinPoseId;
+  reactionPose: RinReactionPoseId | null;
   outfit: RinOutfitId;
   environment: RinEnvironmentId;
   mode: "automatic" | "manual";
@@ -42,31 +44,50 @@ export function isRinEnvironment(value: unknown): value is RinEnvironmentId {
 
 export function deriveRinState(
   userText: string,
-  replyText: string,
+  _replyText: string,
   overrides: RinManualOverrides = {},
 ): RinCharacterState {
-  const context = (userText + " " + replyText).toLowerCase();
+  // React to what the user actually said. Rin's own reply must not trigger her emotion.
+  const context = userText.toLowerCase();
   let expression: RinExpressionId = "neutral";
   let expressionReason = "Default conversational state";
+  let reactionPose: RinReactionPoseId | null = null;
 
-  if (/(thank|great|glad|excited|love that|haha|lol|ดีใจ|ขอบคุณ|เยี่ยม|555)/i.test(context)) {
+  if (/(^|\\b)(hello|hi|hey|good morning|good afternoon|good evening)(\\b|$)|สวัสดี|หวัดดี/i.test(context)) {
+    expression = "smile";
+    reactionPose = "wave";
+    expressionReason = "Greeting";
+  } else if (/(embarrass|awkward|shy|fluster|blush|เขิน|อาย)/i.test(context)) {
+    expression = "embarrassed";
+    reactionPose = "cheeks";
+    expressionReason = "Embarrassed or shy tone";
+  } else if (/(not alright|not okay|not ok|feel(?:ing)? (?:down|sad|low|bad)|i'?m (?:tired|exhausted|sad|stressed|worried|anxious)|i am (?:tired|exhausted|sad|stressed|worried|anxious)|worr(y|ied)|sad|stress(?:ed)?|anxious|afraid|เหนื่อย|เครียด|กังวล|เสียใจ|ไม่ไหว|ไม่โอเค|ไม่สบายใจ)/i.test(context)) {
+    expression = "concerned";
+    reactionPose = "hands";
+    expressionReason = "Supportive response to the user's difficult moment";
+  } else if (/(confus(?:ed|ing)|don't understand|do not understand|not sure what|งง|ไม่เข้าใจ)/i.test(context)) {
+    expression = "curious";
+    reactionPose = "chin";
+    expressionReason = "The user signals confusion";
+  } else if (/(surpris|unexpected|really\\?|no way|จริงเหรอ|ตกใจ)/i.test(context)) {
+    expression = "surprised";
+    expressionReason = "Surprising conversational moment";
+  } else if (/(thank|great|glad|excited|love that|haha|lol|ดีใจ|ขอบคุณ|เยี่ยม|555)/i.test(context)) {
     expression = "smile";
     expressionReason = "Positive conversational tone";
-  } else if (/(worr(y|ied)|sad|stress|anxious|afraid|เหนื่อย|เครียด|กังวล|เสียใจ)/i.test(context)) {
-    expression = "concerned";
-    expressionReason = "Supportive response to a difficult topic";
   } else if (/(why|how|think|consider|plan|explain|compare|ทำไม|อย่างไร|วางแผน|วิเคราะห์)/i.test(context)) {
     expression = "thinking";
     expressionReason = "Reflective or problem-solving conversation";
-  } else if (/(surpris|unexpected|really\?|no way|จริงเหรอ|ตกใจ)/i.test(context)) {
-    expression = "surprised";
-    expressionReason = "Surprising conversational moment";
   } else if (/(tease|joke|funny|playful|แซว|ตลก|ล้อเล่น)/i.test(context)) {
     expression = "curious";
     expressionReason = "Lighthearted conversational tone";
   } else if (/(sleep|bed|good night|ง่วง|นอน|ฝันดี)/i.test(context)) {
     expression = "sleepy";
     expressionReason = "Late-night or sleepy conversation";
+  } else if (/(happy|awesome|fantastic|wonderful|amazing|ดีมาก|มีความสุข)/i.test(context)) {
+    expression = "happy";
+    reactionPose = "cheer";
+    expressionReason = "The user shares genuine excitement";
   }
 
   let outfit: RinOutfitId = "casual";
@@ -97,8 +118,9 @@ export function deriveRinState(
   const hasOverrides = Object.values(overrides).some(Boolean);
   return {
     expression: overrides.expression ?? expression,
-    outfit: overrides.outfit ?? outfit,
     pose: overrides.pose ?? pose,
+    reactionPose: overrides.pose ? null : reactionPose,
+    outfit: overrides.outfit ?? outfit,
     environment: overrides.environment ?? environment,
     mode: hasOverrides ? "manual" : "automatic",
     reason: [
