@@ -138,7 +138,8 @@ Mention it naturally only when it is relevant, for example if the user asks what
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "qwen/qwen3.8-27b",
+        // OpenRouter tries these in order, so a wrong or unavailable first ID falls back to the old model.
+        models: [process.env.RIN_MODEL || "deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"],
         messages: [{ role: "system", content: system }, ...conversation],
         temperature: 0.75,
       }),
@@ -152,6 +153,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
     }
 
     const result = await response.json();
+    console.log("[RIN MODEL]", result.model);
     const rawReply = result.choices?.[0]?.message?.content;
     const { text: reply, outfit, expression, pose, room } = parseDirectives(typeof rawReply === "string" ? rawReply : "");
     if (!reply) {
