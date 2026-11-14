@@ -389,9 +389,11 @@ function RinPage() {
                   <span className="hidden rounded-full border border-emerald-400/20 sm:inline-block bg-emerald-400/[0.06] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.15em] text-emerald-300/80">Private</span>
                 </div>
               </div>
-              <div className="relative z-10 mt-auto bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-5 pb-5 pt-24 sm:px-7 sm:pb-7">
-                <p className="max-w-md text-sm font-light leading-relaxed text-zinc-300 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
-                <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">Character preview · Initial presentation</p>
+              <div className="relative z-10 mt-auto w-full bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-6 pb-6 pt-28 sm:px-8 sm:pb-8 sm:pt-32">
+                <div className="mx-auto w-full max-w-2xl">
+                  <p className="w-full break-words text-sm font-light leading-relaxed text-zinc-200 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
+                  <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Character preview · Initial presentation</p>
+                </div>
               </div>
             </section>
 
