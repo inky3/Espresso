@@ -43,7 +43,7 @@ export type WardrobeId = (typeof WARDROBE)[number];
 
 /** Faces Rin can ask for. The stage maps them to the closest existing art. */
 export const EXPRESSION_IDS = [
-  "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "annoyed", "sleepy",
+  "neutral", "smile", "happy", "very-happy", "curious", "thinking", "hard-thinking", "surprised", "concerned", "worried", "embarrassed", "hello", "annoyed", "sleepy",
   "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing",
 ] as const;
 
