@@ -142,7 +142,7 @@ export function spriteFor(outfit: string, expression: string, pose?: PoseId | nu
     : o === "shirt"
       ? { "teasing-1": "teasing" }
       : o === "after-dark"
-        ? { neutral: "smile", thinking: "hard-thinking", concerned: "worried", embarrassed: "embarrassed", smile: "smile" }
+        ? { neutral: "smile", thinking: "hard-thinking", embarrassed: "embarrassed", smile: "smile" }
         : {};
   const defaultFace: FaceArt = o === "after-dark" ? "smile" : "neutral";
   const candidates = [wanted, outfitFallbacks[wanted], defaultFace].filter(Boolean) as FaceArt[];
