@@ -21,7 +21,7 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   casual: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
   hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
   shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "flustered-teasing", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
-  "after-dark": ["smile", "happy", "hard-thinking", "angry", "depressed", "frustrated", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
+  "after-dark": ["smile", "happy", "very-happy", "hard-thinking", "angry", "depressed", "frustrated", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
 };
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
@@ -78,6 +78,12 @@ export const SUPPORTED_EXPRESSIONS = [
   { id: "seduce-1", label: "Seduction · Level 1" },
   { id: "seduce-2", label: "Seduction · Level 2" },
   { id: "seduce-3", label: "Seduction · Level 3" },
+  { id: "smile", label: "Soft smile" },
+  { id: "very-happy", label: "Very happy" },
+  { id: "hard-thinking", label: "Hard thinking" },
+  { id: "worried", label: "Worried" },
+  { id: "embarrassed", label: "Embarrassed" },
+  { id: "hello", label: "Hello" },
 ] as const;
 
 /** Poses, offered in the same menu as faces. Picking one holds it until changed. */
@@ -90,7 +96,8 @@ export const SUPPORTED_POSES = [
 ] as const;
 
 function expressionArt(expression: string): FaceArt {
-  if (["smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
+  if (["smile", "very-happy", "hard-thinking", "worried", "embarrassed", "hello"].includes(expression)) return expression as FaceArt;
+  if (["curious", "surprised"].includes(expression)) return "happy";
   if (expression === "concerned") return "neutral";
   if (expression === "teasing") return "teasing-1";
   if (["seduce-1", "seduce-2", "seduce-3"].includes(expression)) return expression as FaceArt;
