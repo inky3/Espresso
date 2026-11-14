@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireFirebaseUser } from "@/lib/server/auth";
+import { requireFirebaseUser, RIN_PRIVATE_MESSAGE } from "@/lib/server/auth";
 import { verifyRinSession } from "@/lib/server/rin-session";
 import {
   deriveRinState,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/rin/character-state";
 
 export async function POST(req: Request) {
-  const verified = await requireFirebaseUser(req);
+  const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
   if (verified.error) return verified.error;
   if (!verifyRinSession(req, verified.user.uid)) {
     return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });

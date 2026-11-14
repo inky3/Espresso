@@ -1,4 +1,5 @@
 'use client';
+import OwnerGate from "./owner-gate";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -720,7 +721,7 @@ function GrainOverlay() {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function App() {
+function App() {
   const [openPanel, setOpenPanel] = useState<PanelKey>(null);
   const [inputText, setInputText]  = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -1093,5 +1094,12 @@ export default function App() {
         </SidePanel>
       ))}
     </div>
+  );
+}
+export default function EspressoPage() {
+  return (
+    <OwnerGate space="espresso" title="Espresso">
+      <App />
+    </OwnerGate>
   );
 }

@@ -1,4 +1,5 @@
 'use client';
+import OwnerGate from "../owner-gate";
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -7,7 +8,7 @@ import { auth } from "@/lib/firebase";
 import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
 import { isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
 
-export default function RinPage() {
+function RinPage() {
   const [user, setUser] = useState<User | null>(null);
   const [pin, setPin] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -410,5 +411,13 @@ export default function RinPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function RinPrivatePage() {
+  return (
+    <OwnerGate space="rin" title="Espresso / Private space">
+      <RinPage />
+    </OwnerGate>
   );
 }

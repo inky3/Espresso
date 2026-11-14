@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { describeScene, parseDirectives } from "@/lib/rin/scene";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
-import { requireFirebaseUser } from "@/lib/server/auth";
+import { requireFirebaseUser, RIN_PRIVATE_MESSAGE } from "@/lib/server/auth";
 import { verifyRinSession } from "@/lib/server/rin-session";
 
 export const maxDuration = 60;
@@ -72,7 +72,7 @@ async function persistMemory(uid: string, token: string, summary: string, trace:
 }
 
 export async function GET(req: Request) {
-  const verified = await requireFirebaseUser(req);
+  const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
   if (verified.error) return verified.error;
   if (!verifyRinSession(req, verified.user.uid)) return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
@@ -81,7 +81,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const verified = await requireFirebaseUser(req);
+  const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
   if (verified.error) return verified.error;
   if (!verifyRinSession(req, verified.user.uid)) {
     return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });
