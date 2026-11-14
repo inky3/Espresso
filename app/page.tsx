@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm';
 
 // Firebase Import
 import { auth, db } from '@/lib/firebase';
+import { FIREBASE_PROJECT_ID } from '@/lib/firebase-config';
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 
@@ -265,7 +266,7 @@ function useDualStatus(user: User | null) {
         setDbStatus('checking');
         const token = await user.getIdToken();
         const res = await fetch(
-          `https://firestore.googleapis.com/v1/projects/espresso-11e63/databases/(default)/documents/users/${user.uid}/memory/trace`,
+          `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}/memory/trace`,
           { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(5000) }
         );
         setDbStatus(res.ok || res.status === 404 ? 'connected' : 'error');
