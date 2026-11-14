@@ -21,7 +21,7 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   casual: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
   hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
   shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "flustered-teasing", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
-  "after-dark": ["smile", "happy", "hard-thinking", "angry", "depressed", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
+  "after-dark": ["smile", "happy", "hard-thinking", "angry", "depressed", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
 };
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
@@ -136,7 +136,8 @@ export function spriteFor(outfit: string, expression: string, pose?: PoseId | nu
       : o === "after-dark"
         ? { neutral: "smile", thinking: "hard-thinking", concerned: "worried", embarrassed: "embarrassed", smile: "smile" }
         : {};
-  const candidates = [wanted, outfitFallbacks[wanted], "neutral"].filter(Boolean) as FaceArt[];
+  const defaultFace: FaceArt = o === "after-dark" ? "smile" : "neutral";
+  const candidates = [wanted, outfitFallbacks[wanted], defaultFace].filter(Boolean) as FaceArt[];
   const face = candidates.find((candidate) => AVAILABLE_FACES[o].includes(candidate)) ?? "neutral";
   return { key: `${o}-${face}`, missingThinking: wanted === "thinking" && face !== "thinking", poseArt: false };
 }
