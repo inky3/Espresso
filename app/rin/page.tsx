@@ -19,6 +19,7 @@ function RinPage() {
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [chatError, setChatError] = useState("");
   const [characterExpression, setCharacterExpression] = useState("neutral");
   const [manualExpression, setManualExpression] = useState("");
@@ -35,6 +36,7 @@ function RinPage() {
 
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const hopTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hop = (strength = 1) => setHopSignal((current) => ({ id: current.id + 1, strength }));
   const clearHops = () => {
@@ -44,6 +46,11 @@ function RinPage() {
   // Azur Lane-style: one hop as she starts speaking, then a smaller one on up to two later sentences.
   const speak = (text: string) => {
     clearHops();
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+    setSpeaking(true);
+    // Text-only speech animation: keep Rin moving while the reply is being read.
+    const speakingDuration = Math.min(12_000, Math.max(1_800, text.length * 42));
+    speakingTimerRef.current = setTimeout(() => setSpeaking(false), speakingDuration);
     hop(1);
     const sentences = text.split(/(?<=[.!?。！？])\s+/).filter(Boolean);
     let elapsed = 0;
@@ -61,6 +68,7 @@ function RinPage() {
 
   useEffect(() => () => {
     hopTimersRef.current.forEach(clearTimeout);
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
     if (poseTimerRef.current) clearTimeout(poseTimerRef.current);
   }, []);
 
@@ -301,6 +309,7 @@ function RinPage() {
                   room={room}
                   outfit={characterOutfit}
                   expression={sending ? "thinking" : characterExpression}
+                  speaking={speaking}
                   pose={sending ? null : (pose ?? manualPose)}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
