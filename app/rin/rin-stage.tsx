@@ -14,13 +14,14 @@ import { isNightAt, outfitArt, ROOMS, type OutfitArt, type PoseId, type RoomId }
 
 export type TimeMode = "auto" | "day" | "night";
 
-type FaceArt = "neutral" | "happy" | "thinking" | "angry" | "depressed" | "flustered-teasing" | "frustrated" | "sad" | "sleepy" | "teasing-1" | "teasing-2" | "teasing-3" | "tired" | "unintended-teasing" | "teasing";
+type FaceArt = "neutral" | "happy" | "thinking" | "angry" | "depressed" | "flustered-teasing" | "frustrated" | "sad" | "sleepy" | "teasing-1" | "teasing-2" | "teasing-3" | "tired" | "unintended-teasing" | "teasing" | "seduce-1" | "seduce-2" | "seduce-3" | "worried" | "embarrassed" | "hello" | "smile" | "very-happy" | "hard-thinking";
 
 /** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
 const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
-  casual: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing"],
-  hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing"],
-  shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "flustered-teasing", "unintended-teasing"],
+  casual: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
+  hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
+  shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "flustered-teasing", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
+  "after-dark": ["smile", "happy", "hard-thinking", "angry", "depressed", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
 };
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
@@ -30,6 +31,18 @@ const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
   shirt: ["chin", "cheer", "cheeks", "hands", "wave"],
 };
 
+const SPRITE_EXTENSIONS: Record<string, string> = {
+  "after-dark-angry": "png", "after-dark-embarrassed": "png", "after-dark-flustered-teasing": "png",
+  "after-dark-happy": "png", "after-dark-hard-thinking": "png", "after-dark-hello": "png",
+  "after-dark-sad": "png", "after-dark-teasing-1": "png", "after-dark-teasing-2": "png",
+  "after-dark-unintended-teasing": "png", "after-dark-very-happy": "png", "after-dark-worried": "webp",
+  "after-dark-depressed": "webp", "after-dark-frustrated": "webp", "after-dark-sleepy": "webp",
+  "after-dark-seduce-1": "webp", "after-dark-seduce-2": "webp", "after-dark-seduce-3": "webp",
+  "after-dark-tired": "webp", "after-dark-thinking": "png",
+  "casual-seduce-1": "webp", "casual-seduce-2": "webp", "casual-seduce-3": "webp",
+  "hoodie-seduce-1": "png", "hoodie-seduce-2": "webp", "hoodie-seduce-3": "webp",
+  "shirt-seduce-1": "png", "shirt-seduce-2": "png", "shirt-seduce-3": "webp",
+};
 const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) => [
   ...AVAILABLE_FACES[outfit].map((face) => `${outfit}-${face}`),
   ...AVAILABLE_POSES[outfit].map((pose) => `${outfit}-pose-${pose}`),
@@ -42,6 +55,7 @@ export const SUPPORTED_OUTFITS = [
   { id: "casual", label: "Casual" },
   { id: "relaxed", label: "Hoodie" },
   { id: "homewear", label: "Oversized shirt" },
+  { id: "after-dark", label: "After Dark" },
 ] as const;
 
 /** Expressions that have artwork (casual outfit). */
@@ -60,6 +74,9 @@ export const SUPPORTED_EXPRESSIONS = [
   { id: "teasing-3", label: "Teasing 3" },
   { id: "tired", label: "Tired" },
   { id: "unintended-teasing", label: "Unintended teasing" },
+  { id: "seduce-1", label: "Seduction · Level 1" },
+  { id: "seduce-2", label: "Seduction · Level 2" },
+  { id: "seduce-3", label: "Seduction · Level 3" },
 ] as const;
 
 /** Poses, offered in the same menu as faces. Picking one holds it until changed. */
@@ -75,6 +92,7 @@ function expressionArt(expression: string): FaceArt {
   if (["smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
   if (expression === "concerned") return "neutral";
   if (expression === "teasing") return "teasing-1";
+  if (["seduce-1", "seduce-2", "seduce-3"].includes(expression)) return expression as FaceArt;
   return ([
     "neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing",
     "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3",
@@ -115,7 +133,9 @@ export function spriteFor(outfit: string, expression: string, pose?: PoseId | nu
     ? { frustrated: "angry" }
     : o === "shirt"
       ? { "teasing-1": "teasing" }
-      : {};
+      : o === "after-dark"
+        ? { neutral: "smile", thinking: "hard-thinking", concerned: "worried", embarrassed: "embarrassed", smile: "smile" }
+        : {};
   const candidates = [wanted, outfitFallbacks[wanted], "neutral"].filter(Boolean) as FaceArt[];
   const face = candidates.find((candidate) => AVAILABLE_FACES[o].includes(candidate)) ?? "neutral";
   return { key: `${o}-${face}`, missingThinking: wanted === "thinking" && face !== "thinking", poseArt: false };
@@ -232,7 +252,7 @@ export default function RinStage({
               {SPRITES.map((key) => (
                 <img
                   key={key}
-                  src={`/rin/sprite/${key}.webp`}
+                  src={`/rin/sprite/${key}.${SPRITE_EXTENSIONS[key] ?? "webp"}`}
                   alt={key === active ? "Rin, with long dark hair, a white streak in her bangs and round gold glasses" : ""}
                   aria-hidden={key === active ? undefined : true}
                   draggable={false}
