@@ -53,7 +53,7 @@ export function deriveRinState(
   let expressionReason = "Default conversational state";
   let reactionPose: RinReactionPoseId | null = null;
 
-  if (/(^|\\b)(hello|hi|hey|good morning|good afternoon|good evening)(\\b|$)|สวัสดี|หวัดดี/i.test(context)) {
+  if (/(^|\b)(hello|hi|hey|good morning|good afternoon|good evening)(\b|$)|สวัสดี|หวัดดี/i.test(context)) {
     expression = "smile";
     reactionPose = "wave";
     expressionReason = "Greeting";
@@ -61,7 +61,7 @@ export function deriveRinState(
     expression = "embarrassed";
     reactionPose = "cheeks";
     expressionReason = "Embarrassed or shy tone";
-  } else if (/(not alright|not okay|not ok|feel(?:ing)? (?:down|sad|low|bad)|i'?m (?:tired|exhausted|sad|stressed|worried|anxious)|i am (?:tired|exhausted|sad|stressed|worried|anxious)|worr(y|ied)|sad|stress(?:ed)?|anxious|afraid|เหนื่อย|เครียด|กังวล|เสียใจ|ไม่ไหว|ไม่โอเค|ไม่สบายใจ)/i.test(context)) {
+  } else if (/(not alright|not okay|not ok|feel(?:ing)? (?:down|sad|low|bad)|i'?m (?:tired|exhausted|sad|stressed|worried|anxious)|i am (?:a little tired|a bit tired|feeling tired|tired|exhausted|sad|stressed|worried|anxious)|worr(y|ied)|sad|stress(?:ed)?|anxious|afraid|เหนื่อย|เครียด|กังวล|เสียใจ|ไม่ไหว|ไม่โอเค|ไม่สบายใจ)/i.test(context)) {
     expression = "concerned";
     reactionPose = "hands";
     expressionReason = "Supportive response to the user's difficult moment";
@@ -69,7 +69,7 @@ export function deriveRinState(
     expression = "curious";
     reactionPose = "chin";
     expressionReason = "The user signals confusion";
-  } else if (/(surpris|unexpected|really\\?|no way|จริงเหรอ|ตกใจ)/i.test(context)) {
+  } else if (/(surpris|unexpected|really\?|no way|จริงเหรอ|ตกใจ)/i.test(context)) {
     expression = "surprised";
     expressionReason = "Surprising conversational moment";
   } else if (/(that's great|that is great|awesome|fantastic|wonderful|amazing|so happy|ดีมาก|มีความสุข)/i.test(context)) {
