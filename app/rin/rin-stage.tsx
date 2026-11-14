@@ -14,19 +14,19 @@ import { isNightAt, outfitArt, ROOMS, type OutfitArt, type PoseId, type RoomId }
 
 export type TimeMode = "auto" | "day" | "night";
 
-type FaceArt = "neutral" | "happy" | "thinking";
+type FaceArt = "neutral" | "happy" | "thinking" | "angry" | "depressed" | "flustered-teasing" | "frustrated" | "sad" | "sleepy" | "teasing-1" | "teasing-2" | "teasing-3" | "tired" | "unintended-teasing" | "teasing";
 
 /** Faces that exist for each outfit. Add a face here once its /rin/sprite/<outfit>-<face>.webp exists. */
 const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
-  casual: ["neutral", "happy", "thinking"],
-  hoodie: ["neutral", "happy", "thinking"],
-  shirt: ["neutral", "happy", "thinking"],
+  casual: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired"],
+  hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing"],
+  shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "unintended-teasing"],
 };
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
 const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
   casual: ["chin", "cheer", "cheeks", "hands", "wave"],
-  hoodie: ["chin", "cheer", "cheeks", "wave"],
+  hoodie: ["chin", "cheer", "cheeks", "hands", "wave"],
   shirt: ["chin", "cheer", "cheeks", "hands", "wave"],
 };
 
@@ -46,9 +46,20 @@ export const SUPPORTED_OUTFITS = [
 
 /** Expressions that have artwork (casual outfit). */
 export const SUPPORTED_EXPRESSIONS = [
-  { id: "neutral", label: "Soft smile" },
+  { id: "neutral", label: "Neutral" },
   { id: "happy", label: "Happy" },
   { id: "thinking", label: "Thinking" },
+  { id: "angry", label: "Angry" },
+  { id: "depressed", label: "Depressed" },
+  { id: "flustered-teasing", label: "Flustered teasing" },
+  { id: "frustrated", label: "Frustrated" },
+  { id: "sad", label: "Sad" },
+  { id: "sleepy", label: "Sleepy" },
+  { id: "teasing-1", label: "Teasing 1" },
+  { id: "teasing-2", label: "Teasing 2" },
+  { id: "teasing-3", label: "Teasing 3" },
+  { id: "tired", label: "Tired" },
+  { id: "unintended-teasing", label: "Unintended teasing" },
 ] as const;
 
 /** Poses, offered in the same menu as faces. Picking one holds it until changed. */
@@ -61,9 +72,14 @@ export const SUPPORTED_POSES = [
 ] as const;
 
 function expressionArt(expression: string): FaceArt {
-  if (["happy", "smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
-  if (expression === "thinking") return "thinking";
-  return "neutral";
+  if (["smile", "embarrassed", "curious", "surprised"].includes(expression)) return "happy";
+  if (expression === "concerned") return "neutral";
+  if (expression === "teasing") return "teasing-1";
+  return ([
+    "neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing",
+    "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3",
+    "tired", "unintended-teasing",
+  ] as string[]).includes(expression) ? expression as FaceArt : "neutral";
 }
 
 /** Each pose belongs to a feeling; without pose art, that feeling's light motion is used, stronger. */
@@ -95,7 +111,13 @@ export function spriteFor(outfit: string, expression: string, pose?: PoseId | nu
   }
   const feeling = pose ? POSE_FEELING[pose] : expression;
   const wanted = expressionArt(feeling);
-  const face = AVAILABLE_FACES[o].includes(wanted) ? wanted : "neutral";
+  const outfitFallbacks: Partial<Record<FaceArt, FaceArt>> = o === "casual"
+    ? { frustrated: "angry", "unintended-teasing": "teasing-3" }
+    : o === "shirt"
+      ? { "flustered-teasing": "teasing" }
+      : {};
+  const candidates = [wanted, outfitFallbacks[wanted], "neutral"].filter(Boolean) as FaceArt[];
+  const face = candidates.find((candidate) => AVAILABLE_FACES[o].includes(candidate)) ?? "neutral";
   return { key: `${o}-${face}`, missingThinking: wanted === "thinking" && face !== "thinking", poseArt: false };
 }
 
