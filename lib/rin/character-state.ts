@@ -72,7 +72,11 @@ export function deriveRinState(
   } else if (/(surpris|unexpected|really\\?|no way|จริงเหรอ|ตกใจ)/i.test(context)) {
     expression = "surprised";
     expressionReason = "Surprising conversational moment";
-  } else if (/(thank|great|glad|excited|love that|haha|lol|ดีใจ|ขอบคุณ|เยี่ยม|555)/i.test(context)) {
+  } else if (/(that's great|that is great|awesome|fantastic|wonderful|amazing|so happy|ดีมาก|มีความสุข)/i.test(context)) {
+    expression = "happy";
+    reactionPose = "cheer";
+    expressionReason = "The user shares genuine excitement";
+  } else if (/(thank|glad|love that|haha|lol|ดีใจ|ขอบคุณ|เยี่ยม|555)/i.test(context)) {
     expression = "smile";
     expressionReason = "Positive conversational tone";
   } else if (/(why|how|think|consider|plan|explain|compare|ทำไม|อย่างไร|วางแผน|วิเคราะห์)/i.test(context)) {
@@ -84,10 +88,6 @@ export function deriveRinState(
   } else if (/(sleep|bed|good night|ง่วง|นอน|ฝันดี)/i.test(context)) {
     expression = "sleepy";
     expressionReason = "Late-night or sleepy conversation";
-  } else if (/(happy|awesome|fantastic|wonderful|amazing|ดีมาก|มีความสุข)/i.test(context)) {
-    expression = "happy";
-    reactionPose = "cheer";
-    expressionReason = "The user shares genuine excitement";
   }
 
   let outfit: RinOutfitId = "casual";
