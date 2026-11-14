@@ -27,7 +27,7 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
 const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
   casual: ["chin", "cheer", "cheeks", "hands", "wave"],
   hoodie: ["chin", "cheer", "cheeks", "wave"],
-  shirt: [],
+  shirt: ["chin", "cheer", "cheeks", "hands", "wave"],
 };
 
 const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) => [
