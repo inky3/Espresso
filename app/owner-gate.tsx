@@ -107,7 +107,14 @@ export default function OwnerGate({
         if (current?.isAnonymous) await linkWithRedirect(current, provider);
         else await signInWithRedirect(auth, provider);
       } else if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        setMessage("Google sign-in failed. Please try again.");
+        const hints: Record<string, string> = {
+          "auth/unauthorized-domain": `This address (${window.location.hostname}) is not in Firebase's Authorized domains.`,
+          "auth/operation-not-allowed": "Google sign-in is not enabled in Firebase Authentication.",
+          "auth/network-request-failed": "Network problem. Check your connection and try again.",
+          "auth/internal-error": "Firebase returned an internal error. Try again, or try a normal (non-incognito) window.",
+        };
+        setMessage(`${hints[code] ?? "Google sign-in failed."} (${code || "unknown error"})`);
+        console.error("[OwnerGate] Google sign-in failed", error);
       }
     } finally {
       setWorking(false);
