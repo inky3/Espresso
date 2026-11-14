@@ -8,6 +8,30 @@ import { auth } from "@/lib/firebase";
 import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, SUPPORTED_POSES, type TimeMode } from "./rin-stage";
 import { isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
 
+/** Roleplay styling: *narration* is shown dimmer and in italics; everything else is Rin speaking. */
+function renderMessage(content: string) {
+  return content.split(/(\*[^*\n]+\*)/g).map((part, index) =>
+    part.length > 2 && part.startsWith("*") && part.endsWith("*")
+      ? <span key={index} className="italic text-zinc-500">{part.slice(1, -1)}</span>
+      : part,
+  );
+}
+
+const SCENE_KEY = "rin-scene";
+/** The scene (room, outfit, face) as it was left, so a refresh picks up where things were. */
+function savedScene(): { room?: RoomId; outfit?: string; expression?: string } {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(SCENE_KEY) || "{}");
+    return {
+      room: ROOMS.some((r) => r.id === saved.room) ? saved.room : undefined,
+      outfit: typeof saved.outfit === "string" ? saved.outfit : undefined,
+      expression: typeof saved.expression === "string" ? saved.expression : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 function RinPage() {
   const [user, setUser] = useState<User | null>(null);
   const [pin, setPin] = useState("");
@@ -21,15 +45,21 @@ function RinPage() {
   const [sending, setSending] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [chatError, setChatError] = useState("");
-  const [characterExpression, setCharacterExpression] = useState("neutral");
+  const [characterExpression, setCharacterExpression] = useState(() => savedScene().expression ?? "neutral");
   const [manualExpression, setManualExpression] = useState("");
   const [manualPose, setManualPose] = useState<PoseId | null>(null);
-  const [characterOutfit, setCharacterOutfit] = useState("casual");
+  const [characterOutfit, setCharacterOutfit] = useState(() => savedScene().outfit ?? "casual");
   const [manualOutfit, setManualOutfit] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState<TimeMode>("auto");
-  const [room, setRoom] = useState<RoomId>("kitchen");
+  const [room, setRoom] = useState<RoomId>(() => savedScene().room ?? "kitchen");
   const [roomLocked, setRoomLocked] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SCENE_KEY, JSON.stringify({ room, outfit: characterOutfit, expression: characterExpression }));
+    } catch { /* storage unavailable: the scene just won't be remembered */ }
+  }, [room, characterOutfit, characterExpression]);
   const [hopSignal, setHopSignal] = useState({ id: 0, strength: 1 });
   const [pose, setPose] = useState<PoseId | null>(null);
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -409,8 +439,8 @@ function RinPage() {
                   </div>
                 ) : messages.map((message, index) => (
                   <div key={index} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div className={message.role === "user" ? "max-w-[88%] rounded-2xl rounded-br-md bg-[#c6a45b]/15 px-4 py-3 text-sm leading-6 text-zinc-100" : "max-w-[92%] rounded-2xl rounded-bl-md border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-sm leading-6 text-zinc-300"}>
-                      {message.content}
+                    <div className={message.role === "user" ? "max-w-[88%] rounded-2xl rounded-br-md bg-[#c6a45b]/15 px-4 py-3 text-sm leading-6 text-zinc-100" : "max-w-[92%] rounded-2xl rounded-bl-md border border-white/[0.07] bg-white/[0.035] px-4 py-3 whitespace-pre-wrap text-sm leading-6 text-zinc-200"}>
+                      {renderMessage(message.content)}
                     </div>
                   </div>
                 ))}
