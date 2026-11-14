@@ -21,7 +21,7 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   casual: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
   hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
   shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "flustered-teasing", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
-  "after-dark": ["smile", "happy", "hard-thinking", "angry", "depressed", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
+  "after-dark": ["smile", "happy", "hard-thinking", "angry", "depressed", "frustrated", "flustered-teasing", "worried", "embarrassed", "sad", "sleepy", "hello", "teasing-1", "teasing-2", "tired", "unintended-teasing", "seduce-1", "seduce-2", "seduce-3"],
 };
 
 /** Strong-moment poses that exist for each outfit: /rin/sprite/<outfit>-pose-<pose>.webp */
@@ -29,6 +29,7 @@ const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
   casual: ["chin", "cheer", "cheeks", "hands", "wave"],
   hoodie: ["chin", "cheer", "cheeks", "hands", "wave"],
   shirt: ["chin", "cheer", "cheeks", "hands", "wave"],
+  "after-dark": [],
 };
 
 const SPRITE_EXTENSIONS: Record<string, string> = {
