@@ -281,7 +281,7 @@ function RinPage() {
   }
 
   return (
-    <main className="relative h-[100dvh] overflow-y-auto overscroll-contain bg-[#080808] text-zinc-100 selection:bg-[#c9a85d]/30">
+    <main className="relative h-[100dvh] overflow-x-hidden overflow-y-auto overscroll-contain bg-[#080808] text-zinc-100 selection:bg-[#c9a85d]/30">
       {!unlocked ? (
         <div className="min-h-[100dvh] flex items-center justify-center px-5 py-10">
           <section className="w-full max-w-md">
@@ -307,8 +307,8 @@ function RinPage() {
             <button onClick={lock} disabled={locking} className="rounded-full border border-white/10 px-4 py-2 text-[11px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-50">{locking ? "Locking…" : "Lock space"}</button>
           </header>
 
-          <div className="grid flex-1 grid-cols-1 gap-4 py-4 lg:min-h-[calc(100dvh-110px)] lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:gap-6 lg:py-6">
-            <section className="relative isolate flex min-h-[calc(100dvh-112px)] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#111115] lg:min-h-0">
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 py-4 lg:min-h-[calc(100dvh-110px)] lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:gap-6 lg:py-6">
+            <section className="relative isolate flex min-w-0 w-full min-h-[calc(100dvh-112px)] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#111115] lg:min-h-0">
               <div className="absolute inset-0 overflow-hidden bg-[#140c08]">
                 <RinStage
                   room={room}
@@ -321,7 +321,7 @@ function RinPage() {
                 />
                 <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(10,9,9,0.34)_0%,transparent_34%,transparent_76%,rgba(10,9,9,0.18)_100%),linear-gradient(0deg,rgba(8,8,9,0.78)_0%,transparent_38%,rgba(8,8,9,0.08)_100%)]" />
               </div>
-              <div className="relative z-10 flex items-start justify-between px-5 pt-5 sm:px-7 sm:pt-7">
+              <div className="relative z-10 flex min-w-0 flex-wrap items-start justify-between gap-3 px-5 pt-5 sm:px-7 sm:pt-7">
                 <div>
                   <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-500">Your companion</p>
                   <h1 className="mt-1 text-2xl font-light tracking-tight sm:text-3xl">Rin</h1>
@@ -389,9 +389,11 @@ function RinPage() {
                   <span className="hidden rounded-full border border-emerald-400/20 sm:inline-block bg-emerald-400/[0.06] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.15em] text-emerald-300/80">Private</span>
                 </div>
               </div>
-              <div className="relative z-10 mt-auto bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-5 pb-5 pt-24 sm:px-7 sm:pb-7">
-                <p className="max-w-md text-sm font-light leading-relaxed text-zinc-300 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
-                <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">Character preview · Initial presentation</p>
+              <div className="relative z-10 mt-auto block w-full max-w-full bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/90 to-transparent px-6 pb-6 pt-28 sm:px-8 sm:pb-8 sm:pt-32">
+                <div className="mx-0 w-full max-w-2xl">
+                  <p className="w-full break-words text-sm font-light leading-relaxed text-zinc-200 sm:text-base">“There you are. Take your time — we don't have to rush.”</p>
+                  <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">Character preview · Initial presentation</p>
+                </div>
               </div>
             </section>
 

@@ -26,6 +26,7 @@ export const RIN_ASSET_CATALOG = {
     homewear: { label: "Homewear (Lounge)", path: "/rin/outfits/homewear.webp" },
     sleepwear: { label: "Sleepwear (Night)", path: "/rin/outfits/sleepwear.webp" },
     formal: { label: "Formal (Occasion)", path: "/rin/outfits/formal.webp" },
+    "after-dark": { label: "After Dark", path: "/rin/sprite/after-dark-smile.webp" },
   },
   poses: {
     working: { label: "Working", path: "/rin/poses/working.webp" },

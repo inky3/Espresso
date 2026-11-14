@@ -4,7 +4,7 @@
  * replies match what the user actually sees.
  */
 
-export type OutfitArt = "casual" | "hoodie" | "shirt";
+export type OutfitArt = "casual" | "hoodie" | "shirt" | "after-dark";
 export const ROOMS = [
   { id: "kitchen", label: "Kitchen" },
   { id: "bedroom", label: "Bedroom" },
@@ -16,6 +16,7 @@ export type TimeOfDay = "day" | "night";
 export function outfitArt(outfit: string): OutfitArt {
   if (outfit === "relaxed") return "hoodie";
   if (outfit === "homewear" || outfit === "sleepwear") return "shirt";
+  if (outfit === "after-dark") return "after-dark";
   return "casual";
 }
 
@@ -23,6 +24,7 @@ const OUTFIT_DESCRIPTIONS: Record<OutfitArt, string> = {
   casual: "a cream oversized cable-knit sweater and a dark brown pleated skirt",
   hoodie: "an oversized charcoal-gray hoodie with the hood down and black lounge shorts",
   shirt: "an oversized white button-up shirt slipping off one shoulder, with short gray lounge shorts underneath",
+  "after-dark": "the After Dark dress outfit",
 };
 
 const ROOM_DESCRIPTIONS: Record<RoomId, string> = {
@@ -36,12 +38,12 @@ export function isNightAt(date = new Date()) {
 }
 
 /** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
-export const WARDROBE = ["casual", "relaxed", "homewear"] as const;
+export const WARDROBE = ["casual", "relaxed", "homewear", "after-dark"] as const;
 export type WardrobeId = (typeof WARDROBE)[number];
 
 /** Faces Rin can ask for. The stage maps them to the closest existing art. */
 export const EXPRESSION_IDS = [
-  "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "annoyed", "sleepy",
+  "neutral", "smile", "happy", "very-happy", "curious", "thinking", "hard-thinking", "surprised", "concerned", "worried", "embarrassed", "hello", "annoyed", "sleepy",
   "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing",
 ] as const;
 
@@ -61,6 +63,7 @@ const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
   homewear: `${OUTFIT_DESCRIPTIONS.shirt} (lazy mornings, late nights at home, getting ready for bed)`,
+  "after-dark": `${OUTFIT_DESCRIPTIONS["after-dark"]} (evening / special look)`,
 };
 
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
