@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireFirebaseUser } from "@/lib/server/auth";
+import { requireFirebaseUser, RIN_PRIVATE_MESSAGE } from "@/lib/server/auth";
 import { verifyRinSession, rinCookie } from "@/lib/server/rin-session";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const verified = await requireFirebaseUser(req);
+  const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
   if (verified.error) return verified.error;
   const session = verifyRinSession(req, verified.user.uid);
   return NextResponse.json({ unlocked: Boolean(session) });

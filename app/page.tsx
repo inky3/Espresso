@@ -1,4 +1,5 @@
 'use client';
+import OwnerGate from "./owner-gate";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +13,7 @@ import remarkGfm from 'remark-gfm';
 
 // Firebase Import
 import { auth, db } from '@/lib/firebase';
+import { FIREBASE_PROJECT_ID } from '@/lib/firebase-config';
 import { signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 
@@ -264,7 +266,7 @@ function useDualStatus(user: User | null) {
         setDbStatus('checking');
         const token = await user.getIdToken();
         const res = await fetch(
-          `https://firestore.googleapis.com/v1/projects/espresso-11e63/databases/(default)/documents/users/${user.uid}/memory/trace`,
+          `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${user.uid}/memory/trace`,
           { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(5000) }
         );
         setDbStatus(res.ok || res.status === 404 ? 'connected' : 'error');
@@ -720,7 +722,7 @@ function GrainOverlay() {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function App() {
+function App() {
   const [openPanel, setOpenPanel] = useState<PanelKey>(null);
   const [inputText, setInputText]  = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -1093,5 +1095,12 @@ export default function App() {
         </SidePanel>
       ))}
     </div>
+  );
+}
+export default function EspressoPage() {
+  return (
+    <OwnerGate space="espresso" title="Espresso">
+      <App />
+    </OwnerGate>
   );
 }
