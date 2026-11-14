@@ -229,6 +229,7 @@ function RinPage() {
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
       // Rin chooses her own outfit and face; a manual outfit only changes if she was asked to.
       const chosenExpression = applyRinChoices(data);
+      const chosenPose = typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose);
       speak(data.text);
       try {
         const stateResponse = await fetch("/api/rin/state", {
@@ -239,9 +240,13 @@ function RinPage() {
         const stateData = await stateResponse.json();
         if (stateResponse.ok) {
           const nextExpression = stateData.state?.expression;
-          // Fallback face from the keyword heuristic, only when Rin didn't pick one.
-          if (typeof nextExpression === "string" && !chosenExpression) {
+          // Apply heuristic reactions only when Rin and the user have not chosen manually.
+          if (typeof nextExpression === "string" && !chosenExpression && !manualExpression) {
             setCharacterExpression(nextExpression);
+          }
+          const reactionPose = stateData.state?.reactionPose;
+          if (typeof reactionPose === "string" && (POSE_IDS as readonly string[]).includes(reactionPose) && !chosenPose && !manualPose) {
+            strikePose(reactionPose as PoseId);
           }
         }
       } catch { /* Character state is an enhancement; it must not interrupt conversation. */ }
