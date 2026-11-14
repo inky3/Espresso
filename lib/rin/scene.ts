@@ -94,7 +94,8 @@ ${roomLocked === true
 To move, end your reply with [[room:ID]] on its own line. You may mention it naturally ("come, let's sit in my room").
 
 To change outfit, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
-You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.
+You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${[...EXPRESSION_IDS.filter((id) => !/^teasing-\d$/.test(id)), "teasing"].join(", ")}.
+Notes: "teasing" is for playfully teasing the user. "flustered-teasing" is for when you are really trying to tease them to get their attention. "unintended-teasing" is for when you tease or say something suggestive without meaning to.
 For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
 }
@@ -111,7 +112,11 @@ export function parseDirectives(reply: string): { text: string; outfit?: Wardrob
       if (kind.toLowerCase() === "room" && ROOMS.some((r) => r.id === value)) room = value as RoomId;
       if (kind.toLowerCase() === "pose" && (POSE_IDS as readonly string[]).includes(value)) pose = value as PoseId;
       if (kind.toLowerCase() === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
-      if (kind.toLowerCase() === "expression" && (EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
+      if (kind.toLowerCase() === "expression") {
+        // "teasing" has three interchangeable images: pick one at random.
+        if (value === "teasing") expression = `teasing-${1 + Math.floor(Math.random() * 3)}`;
+        else if ((EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
+      }
       return "";
     })
     .replace(/\n{3,}/g, "\n\n")
