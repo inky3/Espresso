@@ -328,7 +328,7 @@ function RinPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <label htmlFor="rin-expression" className="sr-only">Character expression</label>
-                  <select id="rin-expression" value={manualPose ? `pose:${manualPose}` : manualExpression} onChange={async (event) => {
+                  <select id="rin-expression" value={manualPose ? `pose:${manualPose}` : manualExpression} onChange={(event) => {
                     const value = event.target.value;
                     if (value.startsWith("pose:")) {
                       setManualPose(value.slice(5) as PoseId);
@@ -337,17 +337,9 @@ function RinPage() {
                     }
                     setManualPose(null);
                     setManualExpression(value);
-                    if (!user) return;
-                    try {
-                      const token = await user.getIdToken();
-                      const response = await fetch("/api/rin/state", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-                        body: JSON.stringify({ manualExpression: value || null }),
-                      });
-                      const data = await response.json();
-                      if (response.ok) { setCharacterExpression(data.state.expression); hop(0.7); }
-                    } catch { /* Keep the current expression if the state request fails. */ }
+                    // Applied locally: the state API only knows the original ten expressions.
+                    setCharacterExpression(value || "neutral");
+                    hop(0.7);
                   }} className="max-w-[118px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">
                     <option value="">Auto expression</option>
                     {SUPPORTED_EXPRESSIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
