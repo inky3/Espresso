@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import RinStage, { ROOM, SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
-import { isNightAt, POSE_IDS, type PoseId } from "@/lib/rin/scene";
+import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, type TimeMode } from "./rin-stage";
+import { isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
 
 export default function RinPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,6 +25,8 @@ export default function RinPage() {
   const [manualOutfit, setManualOutfit] = useState("");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState<TimeMode>("auto");
+  const [room, setRoom] = useState<RoomId>("kitchen");
+  const [roomLocked, setRoomLocked] = useState(false);
   const [hopSignal, setHopSignal] = useState({ id: 0, strength: 1 });
   const [pose, setPose] = useState<PoseId | null>(null);
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,13 +73,14 @@ export default function RinPage() {
 
   const currentScene = () => ({
     outfit: characterOutfit,
-    room: ROOM,
+    room,
+    roomLocked,
     time: timeMode === "auto" ? (isNightAt() ? "night" : "day") : timeMode,
     outfitLocked: Boolean(manualOutfit),
   });
 
   // Applies what Rin chose for herself (outfit, face, pose). Returns the chosen face, if any.
-  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown }) => {
+  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown; room?: unknown }) => {
     const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
     const chosenExpression = typeof data.expression === "string" ? data.expression : null;
     if (chosenOutfit) {
@@ -86,6 +89,7 @@ export default function RinPage() {
     }
     if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
     if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose)) strikePose(data.pose as PoseId);
+    if (typeof data.room === "string" && ROOMS.some((r) => r.id === data.room)) setRoom(data.room as RoomId);
     return chosenExpression;
   };
 
@@ -291,6 +295,7 @@ export default function RinPage() {
             <section className="relative isolate flex min-h-[calc(100dvh-112px)] flex-col overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#111115] lg:min-h-0">
               <div className="absolute inset-0 overflow-hidden bg-[#140c08]">
                 <RinStage
+                  room={room}
                   outfit={characterOutfit}
                   expression={sending ? "thinking" : characterExpression}
                   pose={sending ? null : pose}
@@ -342,6 +347,20 @@ export default function RinPage() {
                   }} className="max-w-[125px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">
                     <option value="">Auto outfit</option>
                     {SUPPORTED_OUTFITS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                  </select>
+                  <label htmlFor="rin-room" className="sr-only">Room</label>
+                  <select
+                    id="rin-room"
+                    value={roomLocked ? room : "auto"}
+                    onChange={(event) => {
+                      if (event.target.value === "auto") return setRoomLocked(false);
+                      setRoom(event.target.value as RoomId);
+                      setRoomLocked(true);
+                    }}
+                    className="max-w-[104px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none"
+                  >
+                    <option value="auto">Auto room</option>
+                    {ROOMS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                   </select>
                   <label htmlFor="rin-time" className="sr-only">Time of day</label>
                   <select id="rin-time" value={timeMode} onChange={(event) => setTimeMode(event.target.value as TimeMode)} className="max-w-[96px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">

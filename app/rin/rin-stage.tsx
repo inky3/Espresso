@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- layered, pre-optimised sprites need plain <img> stacking */
 
 import { useEffect, useRef, useState } from "react";
-import { isNightAt, outfitArt, type OutfitArt, type PoseId } from "@/lib/rin/scene";
+import { isNightAt, outfitArt, ROOMS, type OutfitArt, type PoseId, type RoomId } from "@/lib/rin/scene";
 
 /**
  * Azur Lane-style character stage: a still room (day/night crossfade, softly
@@ -34,7 +34,8 @@ const SPRITES = (Object.keys(AVAILABLE_FACES) as OutfitArt[]).flatMap((outfit) =
   ...AVAILABLE_FACES[outfit].map((face) => `${outfit}-${face}`),
   ...AVAILABLE_POSES[outfit].map((pose) => `${outfit}-pose-${pose}`),
 ]);
-export const ROOM = "kitchen";
+/** Horizontal focus per room, so the open floor sits behind Rin. */
+const ROOM_FOCUS: Record<RoomId, string> = { kitchen: "44% 50%", bedroom: "47% 50%" };
 
 /** Outfits that have artwork. Everything else falls back to the closest one. */
 export const SUPPORTED_OUTFITS = [
@@ -97,12 +98,14 @@ function amplify(transform: string) {
 const isNightNow = () => isNightAt();
 
 export default function RinStage({
+  room = "kitchen",
   outfit,
   expression,
   pose = null,
   hopSignal,
   timeMode,
 }: {
+  room?: RoomId;
   outfit: string;
   expression: string;
   /** A strong moment (hand on chin, wave, …). Shown briefly; the page clears it. */
@@ -165,19 +168,26 @@ export default function RinStage({
   const lightTransform = reducedMotion || poseArt || !motion ? "none" : pose ? amplify(motion.transform) : motion.transform;
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-[#140c08]" data-room={ROOM} data-time={night ? "night" : "day"} data-sprite={active} data-pose={pose ?? ""}>
+    <div className="absolute inset-0 overflow-hidden bg-[#140c08]" data-room={room} data-time={night ? "night" : "day"} data-sprite={active} data-pose={pose ?? ""}>
       {/* Room: never moves. Slight blur + dim so Rin reads as the subject. */}
-      {(["day", "night"] as const).map((time) => (
-        <img
-          key={time}
-          src={`/rin/rooms/${ROOM}-${time}.webp`}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          className="absolute inset-0 h-full w-full scale-[1.04] select-none object-cover object-[44%_50%] transition-opacity duration-[1500ms] ease-in-out"
-          style={{ opacity: (time === "night") === night ? 1 : 0, filter: `blur(2.5px) brightness(${night ? 0.82 : 0.9})` }}
-        />
-      ))}
+      {ROOMS.flatMap(({ id }) =>
+        (["day", "night"] as const).map((time) => (
+          <img
+            key={`${id}-${time}`}
+            src={`/rin/rooms/${id}-${time}.webp`}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            loading={id === room ? "eager" : "lazy"}
+            className="absolute inset-0 h-full w-full scale-[1.04] select-none object-cover transition-opacity duration-[1200ms] ease-in-out"
+            style={{
+              opacity: id === room && (time === "night") === night ? 1 : 0,
+              objectPosition: ROOM_FOCUS[id],
+              filter: `blur(2.5px) brightness(${night ? 0.82 : 0.9})`,
+            }}
+          />
+        )),
+      )}
 
       {/* Rin */}
       <div className="pointer-events-none absolute inset-x-0 bottom-[-5%] top-[4%] flex justify-center">

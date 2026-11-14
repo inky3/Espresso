@@ -5,7 +5,11 @@
  */
 
 export type OutfitArt = "casual" | "hoodie" | "shirt";
-export type RoomId = "kitchen";
+export const ROOMS = [
+  { id: "kitchen", label: "Kitchen" },
+  { id: "bedroom", label: "Bedroom" },
+] as const;
+export type RoomId = (typeof ROOMS)[number]["id"];
 export type TimeOfDay = "day" | "night";
 
 /** Maps a catalogue outfit ID to the artwork that exists for it. */
@@ -23,6 +27,7 @@ const OUTFIT_DESCRIPTIONS: Record<OutfitArt, string> = {
 
 const ROOM_DESCRIPTIONS: Record<RoomId, string> = {
   kitchen: "your cozy home kitchen, with a brass espresso machine on the counter",
+  bedroom: "your cozy bedroom, with a wooden bed, a soft rug and a little lamp on the nightstand",
 };
 
 export function isNightAt(date = new Date()) {
@@ -60,7 +65,7 @@ const WARDROBE_NOTES: Record<WardrobeId, string> = {
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
 export function describeScene(scene: unknown): string | null {
   if (!scene || typeof scene !== "object") return null;
-  const { outfit, room, time, outfitLocked } = scene as Record<string, unknown>;
+  const { outfit, room, time, outfitLocked, roomLocked } = scene as Record<string, unknown>;
   const lines: string[] = [];
   if (typeof outfit === "string" && outfit.length <= 32) {
     lines.push(`You are wearing ${OUTFIT_DESCRIPTIONS[outfitArt(outfit)]}.`);
@@ -80,20 +85,29 @@ ${wardrobe}
 ${outfitLocked === true
     ? "The user picked your current outfit themselves. Keep it unless they ask you to change."
     : "Change outfit only when it genuinely fits the moment (getting cozy, late at night, relaxing, starting the day) or when the user asks. Do not change often; most replies keep the current outfit."}
-To change, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
+YOUR ROOMS (you can move between them):
+${ROOMS.map((r) => `- ${r.id}: ${ROOM_DESCRIPTIONS[r.id]}`).join("\n")}
+${roomLocked === true
+    ? "The user picked the current room themselves. Stay there unless they ask to move."
+    : "Move only when it fits the moment (making coffee or a snack, going to bed, winding down) or when the user asks. Most replies stay in the same room."}
+To move, end your reply with [[room:ID]] on its own line. You may mention it naturally ("come, let's sit in my room").
+
+To change outfit, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
 You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.
 For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
 }
 
 /** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */
-export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string; pose?: PoseId } {
+export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string; pose?: PoseId; room?: RoomId } {
+  let room: RoomId | undefined;
   let outfit: WardrobeId | undefined;
   let expression: string | undefined;
   let pose: PoseId | undefined;
   const text = reply
-    .replace(/\[\[\s*(outfit|expression|pose)\s*:\s*([a-z_-]+)\s*\]\]/gi, (_, kind: string, id: string) => {
+    .replace(/\[\[\s*(outfit|expression|pose|room)\s*:\s*([a-z_-]+)\s*\]\]/gi, (_, kind: string, id: string) => {
       const value = id.toLowerCase();
+      if (kind.toLowerCase() === "room" && ROOMS.some((r) => r.id === value)) room = value as RoomId;
       if (kind.toLowerCase() === "pose" && (POSE_IDS as readonly string[]).includes(value)) pose = value as PoseId;
       if (kind.toLowerCase() === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
       if (kind.toLowerCase() === "expression" && (EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
@@ -101,5 +115,5 @@ export function parseDirectives(reply: string): { text: string; outfit?: Wardrob
     })
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  return { text, outfit, expression, pose };
+  return { text, outfit, expression, pose, room };
 }

@@ -153,7 +153,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
 
     const result = await response.json();
     const rawReply = result.choices?.[0]?.message?.content;
-    const { text: reply, outfit, expression, pose } = parseDirectives(typeof rawReply === "string" ? rawReply : "");
+    const { text: reply, outfit, expression, pose, room } = parseDirectives(typeof rawReply === "string" ? rawReply : "");
     if (!reply) {
       return NextResponse.json({ error: "Rin returned an empty response. Please try again." }, { status: 502 });
     }
@@ -165,7 +165,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
     const history = [...memory.history, ...(lastUserMessage ? [{ role: "user" as const, content: lastUserMessage.content }] : []), { role: "assistant" as const, content: reply }].slice(-40);
     after(async () => persistMemory(verified.user.uid, token, memory.summary, trace, history));
 
-    return NextResponse.json({ text: reply, ...(outfit ? { outfit } : {}), ...(expression ? { expression } : {}), ...(pose ? { pose } : {}) });
+    return NextResponse.json({ text: reply, ...(outfit ? { outfit } : {}), ...(expression ? { expression } : {}), ...(pose ? { pose } : {}), ...(room ? { room } : {}) });
   } catch (error) {
     console.error("[RIN CHAT ERROR]", error);
     return NextResponse.json({ error: "Rin's reply couldn't be completed. Please try again." }, { status: 500 });
