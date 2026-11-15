@@ -6,7 +6,7 @@ import type { FormEvent } from "react";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, SUPPORTED_POSES, type TimeMode } from "./rin-stage";
-import { isAfterDarkAt, isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
+import { isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
 
 function RinPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -37,8 +37,6 @@ function RinPage() {
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const hopTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const timeOutfitOverrideRef = useRef(false);
-  const preAfterDarkOutfitRef = useRef("casual");
 
   const hop = (strength = 1) => setHopSignal((current) => ({ id: current.id + 1, strength }));
   const clearHops = () => {
@@ -63,29 +61,6 @@ function RinPage() {
       }
     });
   };
-
-  useEffect(() => {
-    const syncAfterDarkOutfit = () => {
-      if (manualOutfit) {
-        timeOutfitOverrideRef.current = false;
-        return;
-      }
-      if (isAfterDarkAt()) {
-        if (!timeOutfitOverrideRef.current) {
-          preAfterDarkOutfitRef.current = characterOutfit === "after-dark" ? "casual" : characterOutfit;
-          timeOutfitOverrideRef.current = true;
-        }
-        setCharacterOutfit("after-dark");
-      } else if (timeOutfitOverrideRef.current) {
-        timeOutfitOverrideRef.current = false;
-        setCharacterOutfit(preAfterDarkOutfitRef.current);
-      }
-    };
-
-    syncAfterDarkOutfit();
-    const timer = setInterval(syncAfterDarkOutfit, 60_000);
-    return () => clearInterval(timer);
-  }, [manualOutfit, characterOutfit]);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -263,7 +238,6 @@ function RinPage() {
           body: JSON.stringify({
             userText: text,
             replyText: data.text,
-            localTime: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`,
             manualExpression: manualExpression || null,
             manualOutfit: manualOutfit || null,
           }),
@@ -274,10 +248,6 @@ function RinPage() {
           // Apply heuristic reactions only when Rin and the user have not chosen manually.
           if (typeof nextExpression === "string" && !chosenExpression && !manualExpression) {
             setCharacterExpression(nextExpression);
-          }
-          const automaticOutfit = stateData.state?.outfit;
-          if (typeof automaticOutfit === "string" && !chosenOutfit && !manualOutfit) {
-            setCharacterOutfit(automaticOutfit);
           }
           const reactionPose = stateData.state?.reactionPose;
           if (typeof reactionPose === "string" && (POSE_IDS as readonly string[]).includes(reactionPose) && !chosenPose && !manualPose) {
