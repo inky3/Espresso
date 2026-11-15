@@ -244,6 +244,17 @@ function RinPage() {
           if (typeof nextExpression === "string" && !chosenExpression && !manualExpression) {
             setCharacterExpression(nextExpression);
           }
+          // Use the heuristic outfit only when the message clearly suggests a context.
+          // Never let the default "casual" fallback overwrite Rin's explicit LLM choice.
+          const suggestedOutfit = stateData.state?.outfit;
+          if (
+            stateData.state?.outfitSuggested === true &&
+            typeof suggestedOutfit === "string" &&
+            !data.outfit &&
+            !manualOutfit
+          ) {
+            setCharacterOutfit(suggestedOutfit);
+          }
           const reactionPose = stateData.state?.reactionPose;
           if (typeof reactionPose === "string" && (POSE_IDS as readonly string[]).includes(reactionPose) && !chosenPose && !manualPose) {
             strikePose(reactionPose as PoseId);
