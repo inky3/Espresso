@@ -4,7 +4,7 @@
  * replies match what the user actually sees.
  */
 
-export type OutfitArt = "casual" | "hoodie" | "shirt";
+export type OutfitArt = "casual" | "hoodie" | "shirt" | "afterdark" | "knitdress";
 export const ROOMS = [
   { id: "kitchen", label: "Kitchen" },
   { id: "bedroom", label: "Bedroom" },
@@ -16,6 +16,8 @@ export type TimeOfDay = "day" | "night";
 export function outfitArt(outfit: string): OutfitArt {
   if (outfit === "relaxed") return "hoodie";
   if (outfit === "homewear" || outfit === "sleepwear") return "shirt";
+  if (outfit === "afterdark") return "afterdark";
+  if (outfit === "knitdress") return "knitdress";
   return "casual";
 }
 
@@ -23,6 +25,8 @@ const OUTFIT_DESCRIPTIONS: Record<OutfitArt, string> = {
   casual: "a cream oversized cable-knit sweater and a dark brown pleated skirt",
   hoodie: "an oversized charcoal-gray hoodie with the hood down and black lounge shorts",
   shirt: "an oversized white button-up shirt slipping off one shoulder, with short gray lounge shorts underneath",
+  afterdark: "a cropped black hoodie left unzipped over a black bra and matching lingerie, with thigh garter straps",
+  knitdress: "a cozy beige cable-knit sweater dress with a dark brown pleated skirt",
 };
 
 const ROOM_DESCRIPTIONS: Record<RoomId, string> = {
@@ -36,17 +40,17 @@ export function isNightAt(date = new Date()) {
 }
 
 /** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
-export const WARDROBE = ["casual", "relaxed", "homewear"] as const;
+export const WARDROBE = ["casual", "relaxed", "homewear", "afterdark", "knitdress"] as const;
 export type WardrobeId = (typeof WARDROBE)[number];
 
 /** Faces Rin can ask for. The stage maps them to the closest existing art. */
 export const EXPRESSION_IDS = [
   "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "annoyed", "sleepy",
-  "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing",
+  "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "worried",
 ] as const;
 
 /** Strong-moment poses Rin can strike briefly. */
-export const POSE_IDS = ["chin", "cheer", "cheeks", "hands", "wave"] as const;
+export const POSE_IDS = ["chin", "cheer", "cheeks", "hands", "wave", "seduce-1", "seduce-2", "seduce-3"] as const;
 export type PoseId = (typeof POSE_IDS)[number];
 
 const POSE_NOTES: Record<PoseId, string> = {
@@ -55,12 +59,17 @@ const POSE_NOTES: Record<PoseId, string> = {
   cheeks: "hands on your cheeks, for being very flustered or embarrassed",
   hands: "hands held together at your chest, for real worry or concern",
   wave: "a small wave, for hello or goodbye",
+  "seduce-1": "a flirty, confident pose — only when the user is flirting with you and you want to tease back",
+  "seduce-2": "a playful seductive pose — only when things are getting spicy and you feel bold",
+  "seduce-3": "your most daring pose — only when you really want to make an impression",
 };
 
 const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
   homewear: `${OUTFIT_DESCRIPTIONS.shirt} (lazy mornings, late nights at home, getting ready for bed)`,
+  afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (flirty, intimate, late-night when he flirts with you)`,
+  knitdress: `${OUTFIT_DESCRIPTIONS.knitdress} (cute, date-ready, autumn afternoons)`,
 };
 
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
@@ -97,7 +106,7 @@ When the user asks you to wear one of these outfits or to move to one of these r
 To change outfit, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
 You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${[...EXPRESSION_IDS.filter((id) => !/^teasing-\d$/.test(id)), "teasing"].join(", ")}.
 Notes: "teasing" is for playfully teasing the user. "flustered-teasing" is for when you are really trying to tease them to get their attention. "unintended-teasing" is for when you tease or say something suggestive without meaning to.
-For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Poses:
+For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Seduce poses are only for when the user is flirting and you want to flirt back — she asks first. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
 }
 
