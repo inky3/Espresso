@@ -17,6 +17,8 @@ export type RinCharacterState = {
   pose: RinPoseId;
   reactionPose: RinReactionPoseId | null;
   outfit: RinOutfitId;
+  /** True only when the current message contains a clear outfit-context signal. */
+  outfitSuggested: boolean;
   environment: RinEnvironmentId;
   mode: "automatic" | "manual";
   reason: string;
@@ -121,6 +123,7 @@ export function deriveRinState(
     pose: overrides.pose ?? pose,
     reactionPose: overrides.pose ? null : reactionPose,
     outfit: overrides.outfit ?? outfit,
+    outfitSuggested: !overrides.outfit && outfitReason !== "Everyday companion mode",
     environment: overrides.environment ?? environment,
     mode: hasOverrides ? "manual" : "automatic",
     reason: [
