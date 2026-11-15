@@ -37,21 +37,6 @@ export function isNightAt(date = new Date()) {
   return minutes < 6 * 60 || minutes >= 17 * 60 + 30;
 }
 
-/** The After Dark outfit is reserved for the user's local late-night window. */
-export function isAfterDarkAt(date = new Date()) {
-  const minutes = date.getHours() * 60 + date.getMinutes();
-  return minutes >= 22 * 60 || minutes < 3 * 60;
-}
-
-/** Validates a browser-local HH:mm value using the same 22:00–03:00 window. */
-export function isAfterDarkTime(localTime: string) {
-  if (!/^\d{2}:\d{2}$/.test(localTime)) return false;
-  const [hours, minutes] = localTime.split(":").map(Number);
-  if (hours > 23 || minutes > 59) return false;
-  const totalMinutes = hours * 60 + minutes;
-  return totalMinutes >= 22 * 60 || totalMinutes < 3 * 60;
-}
-
 /** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
 export const WARDROBE = ["casual", "relaxed", "homewear", "after-dark"] as const;
 export type WardrobeId = (typeof WARDROBE)[number];
@@ -78,8 +63,8 @@ const POSE_NOTES: Record<PoseId, string> = {
 const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
-  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (lazy mornings, late nights at home, getting ready for bed)`,
-  "after-dark": `${OUTFIT_DESCRIPTIONS["after-dark"]} (evening / special look)`,
+  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (casual, friendly, relaxed time at home; this is the current shirt look, not a dedicated pajama outfit)`,
+  "after-dark": `${OUTFIT_DESCRIPTIONS["after-dark"]} (a special look for a sustained, mutually welcomed flirtatious moment)`,
 };
 
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
@@ -104,7 +89,11 @@ YOUR WARDROBE (you change clothes yourself):
 ${wardrobe}
 ${outfitLocked === true
     ? "The user picked your current outfit themselves. Keep it unless they ask you to change."
-    : "Change outfit only when it genuinely fits the moment (getting cozy, late at night, relaxing, starting the day) or when the user asks. Do not change often; most replies keep the current outfit."}
+    : "Do not change clothes because of the clock, time of day, or a single keyword. Outfit changes must grow naturally out of the conversation over multiple turns. Keep the current outfit during the early stages; let your expression and tone change first."}
+OUTFIT PROGRESSION:
+- After Dark: Begin with subtle teasing or flirtation while wearing your current outfit. Let the mood build gradually over several exchanges, using teasing-1/2/3 and then seduce-1/2/3 only as the other person's responses clearly welcome that progression. Do not jump straight to a seduction expression or change clothes after one flirty message. Change to after-dark only when the flirtation has been sustained, clearly mutual, and the moment genuinely calls for a special look. If the conversation cools or the topic changes, do not force escalation.
+- Shirt (homewear): This is a different, friendlier route. Let relaxed, warm, familiar conversation build over several exchanges while keeping the current outfit first. Change to homewear only when the atmosphere has naturally become comfortable and casual at home. This artwork is the current oversized-shirt look, not dedicated pajamas; do not describe it as pajamas or imply new pajama artwork exists.
+- Keep outfit changes rare and meaningful. Expressions can change without changing clothes. Never use time-of-day as a reason by itself.
 YOUR ROOMS (you can move between them):
 ${ROOMS.map((r) => `- ${r.id}: ${ROOM_DESCRIPTIONS[r.id]}`).join("\n")}
 ${roomLocked === true
