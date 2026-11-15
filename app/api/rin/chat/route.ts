@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { describeScene, gateChoices, parseDirectives } from "@/lib/rin/scene";
+import { describeScene, gateChoices, limitActions, parseDirectives } from "@/lib/rin/scene";
 import { deriveRinState } from "@/lib/rin/character-state";
 import { applyFactOps, CALM, decayMood, mindSection, moodFace, parseReflection, reflectionPrompt, RIN_PERSONA, stepMood, type Fact, type Mood } from "@/lib/rin/mind";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
@@ -202,7 +202,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
     console.log("[RIN MODEL]", result.model);
     const rawReply = result.choices?.[0]?.message?.content;
     const parsed = parseDirectives(typeof rawReply === "string" ? rawReply : "");
-    const reply = parsed.text;
+    const reply = limitActions(parsed.text);
     if (!reply) {
       return NextResponse.json({ error: "Rin returned an empty response. Please try again." }, { status: 502 });
     }
