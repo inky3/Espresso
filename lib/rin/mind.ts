@@ -32,7 +32,7 @@ export type Mood = { label: MoodId; intensity: number; why: string; at: number }
 /** Face Rin rests on when nothing in the current reply asks for another one. */
 const MOOD_FACE: Record<MoodId, string> = {
   calm: "neutral", happy: "happy", playful: "teasing-1", affectionate: "smile",
-  flustered: "embarrassed", worried: "worried", sad: "sad", tired: "tired", annoyed: "frustrated",
+  flustered: "flustered", worried: "worried", sad: "sad", tired: "tired", annoyed: "frustrated",
 };
 
 export const CALM: Mood = { label: "calm", intensity: 0.3, why: "", at: 0 };
