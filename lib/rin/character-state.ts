@@ -5,7 +5,7 @@ import {
   type RinOutfitId,
   type RinPoseId,
 } from "./character-assets";
-import { isAfterDarkTime, type PoseId as RinReactionPoseId } from "./scene";
+import type { PoseId as RinReactionPoseId } from "./scene";
 
 export const RIN_EXPRESSIONS = Object.keys(RIN_ASSET_CATALOG.expressions) as RinExpressionId[];
 export const RIN_OUTFITS = Object.keys(RIN_ASSET_CATALOG.outfits) as RinOutfitId[];
@@ -46,7 +46,6 @@ export function deriveRinState(
   userText: string,
   _replyText: string,
   overrides: RinManualOverrides = {},
-  localTime = "",
 ): RinCharacterState {
   // React to what the user actually said. Rin's own reply must not trigger her emotion.
   const context = userText.toLowerCase();
@@ -91,23 +90,10 @@ export function deriveRinState(
     expressionReason = "Late-night or sleepy conversation";
   }
 
-  // Only choose outfits that the current Rin stage can actually render.
-  // Work/study and exercise fall back to Casual because dedicated art is not installed.
-  let outfit: RinOutfitId = "casual";
-  let outfitReason = "Everyday companion mode";
-  if (isAfterDarkTime(localTime)) {
-    outfit = "after-dark";
-    outfitReason = "Late-night window (22:00–03:00)";
-  } else if (/(date night|going out|night out|evening event|dinner date|party|special occasion|ออกเดต|ไปเดต|ไปงานกลางคืน|ดินเนอร์)/i.test(context)) {
-    outfit = "after-dark";
-    outfitReason = "Evening or special occasion";
-  } else if (/(sleep|bedtime|good night|ง่วง|เข้านอน|ฝันดี|เข้านอนแล้ว)/i.test(context)) {
-    outfit = "homewear";
-    outfitReason = "Getting ready for bed";
-  } else if (/(home|relax|rest|sofa|พักผ่อน|อยู่บ้าน|ชิล|สบายๆ)/i.test(context)) {
-    outfit = "relaxed";
-    outfitReason = "Relaxed at-home context";
-  }
+  // Wardrobe changes are handled by the conversation-aware chat directives.
+  // This state endpoint only preserves explicit manual outfit overrides.
+  const outfit: RinOutfitId = overrides.outfit ?? "casual";
+  const outfitReason = overrides.outfit ? "Outfit manually selected" : "Wardrobe managed by conversation directives";
 
   let pose: RinPoseId = "seated";
   if (/(work|office|coding|ทำงาน)/i.test(context)) pose = "working";
