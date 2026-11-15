@@ -67,8 +67,8 @@ const POSE_NOTES: Record<PoseId, string> = {
 const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
-  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (lazy mornings, late nights at home, getting ready for bed)`,
-  afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (flirty, intimate, late-night when he flirts with you)`,
+  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (friendly, easy-going chat at home, lazy mornings)`,
+  afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (only after he has been flirting and teasing with you for a while and the mood has built up; never as a first or sudden change; ask him first)`,
   knitdress: `${OUTFIT_DESCRIPTIONS.knitdress} (cute, date-ready, autumn afternoons)`,
 };
 
@@ -94,7 +94,7 @@ YOUR WARDROBE (you change clothes yourself):
 ${wardrobe}
 ${outfitLocked === true
     ? "The user picked your current outfit themselves. Keep it unless they ask you to change."
-    : "Change outfit only when it genuinely fits the moment (getting cozy, late at night, relaxing, starting the day) or when the user asks. Do not change often; most replies keep the current outfit."}
+    : "Keep your current outfit unless there is a clear reason: the user asks, or the conversation has clearly moved into a mood that fits another outfit. Never change on a whim; most replies keep the current outfit."}
 YOUR ROOMS (you can move between them):
 ${ROOMS.map((r) => `- ${r.id}: ${ROOM_DESCRIPTIONS[r.id]}`).join("\n")}
 ${roomLocked === true
@@ -108,6 +108,38 @@ You may also end your reply with [[expression:ID]] to choose the face you show f
 Notes: "teasing" is for playfully teasing the user. "flustered-teasing" is for when you are really trying to tease them to get their attention. "unintended-teasing" is for when you tease or say something suggestive without meaning to.
 For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Seduce poses are only for when the user is flirting and you want to flirt back — she asks first. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
+}
+
+const ASKED_OUTFIT = /\b(wear|put on|change|switch|outfit|dress|clothes|get changed|try on)\b|ใส่|เปลี่ยนชุด|ชุด/i;
+const ASKED_ROOM = /\b(go|move|come|head|let'?s)\b[^.?!]*\b(kitchen|bedroom|room|bed)\b|ไปห้อง|ไปครัว/i;
+const ASKED_AFTERDARK = /after ?dark|lingerie|something (sexier|more revealing)/i;
+const FLIRT = /\b(cute|pretty|beautiful|gorgeous|hot|sexy|kiss|flirt|tease|teasing|babe|baby|darling|love you|miss you|cuddle|hug|attractive)\b|น่ารัก|สวย|เซ็กซี่|จูบ|กอด|คิดถึง|รักนะ/i;
+
+/**
+ * Decides which of Rin's own outfit/room choices actually apply.
+ * Priority: the user's manual pick > Rin's choice (only when the user asked) > no change.
+ * After Dark only after flirting has built up over several messages, or when asked for directly.
+ */
+export function gateChoices(
+  choice: { outfit?: WardrobeId; room?: RoomId },
+  ctx: { greeting: boolean; userMessages: string[]; scene: unknown },
+): { outfit?: WardrobeId; room?: RoomId } {
+  const scene = (ctx.scene && typeof ctx.scene === "object" ? ctx.scene : {}) as Record<string, unknown>;
+  const last = ctx.userMessages.at(-1) ?? "";
+  let { outfit, room } = choice;
+
+  if (outfit) {
+    const current = typeof scene.outfit === "string" ? outfitArt(scene.outfit) : null;
+    const asked = ASKED_OUTFIT.test(last);
+    if (ctx.greeting || outfitArt(outfit) === current) outfit = undefined;
+    else if (scene.outfitLocked === true && !asked) outfit = undefined;
+    else if (outfit === "afterdark") {
+      const flirty = ctx.userMessages.slice(-6).filter((m) => FLIRT.test(m)).length;
+      if (!ASKED_AFTERDARK.test(last) && !(flirty >= 3 && FLIRT.test(last))) outfit = undefined;
+    }
+  }
+  if (room && (room === scene.room || (scene.roomLocked === true && !ASKED_ROOM.test(last)))) room = undefined;
+  return { outfit, room };
 }
 
 /** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */

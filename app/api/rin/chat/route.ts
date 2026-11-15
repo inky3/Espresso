@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
-import { describeScene, parseDirectives } from "@/lib/rin/scene";
+import { describeScene, gateChoices, parseDirectives } from "@/lib/rin/scene";
+import { deriveRinState } from "@/lib/rin/character-state";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
 import { requireFirebaseUser, RIN_PRIVATE_MESSAGE } from "@/lib/server/auth";
 import { verifyRinSession } from "@/lib/server/rin-session";
@@ -155,12 +156,19 @@ Mention it naturally only when it is relevant, for example if the user asks what
     const result = await response.json();
     console.log("[RIN MODEL]", result.model);
     const rawReply = result.choices?.[0]?.message?.content;
-    const { text: reply, outfit, expression, pose, room } = parseDirectives(typeof rawReply === "string" ? rawReply : "");
+    const parsed = parseDirectives(typeof rawReply === "string" ? rawReply : "");
+    const reply = parsed.text;
     if (!reply) {
       return NextResponse.json({ error: "Rin returned an empty response. Please try again." }, { status: 502 });
     }
 
     const lastUser = [...messages].reverse().find((message: any) => message.role === "user")?.content || "";
+    const userMessages = greeting ? [] : (messages as { role: string; content: string }[]).filter((m) => m.role === "user").map((m) => m.content);
+    const { outfit, room } = gateChoices(parsed, { greeting, userMessages, scene: body?.scene });
+    // One state per reply: Rin's own face/pose first, else a reaction to what the user said.
+    const reaction = greeting ? null : deriveRinState(lastUser, reply);
+    const expression = parsed.expression ?? reaction?.expression;
+    const pose = parsed.pose ?? reaction?.reactionPose ?? undefined;
     const exchange = greeting ? `Rin (spoke first): ${reply.slice(0, 500)}` : `You: ${lastUser.slice(0, 350)}\nRin: ${reply.slice(0, 500)}`;
     const trace = [memory.trace, exchange].filter(Boolean).join("\n\n").slice(-10000);
     const lastUserMessage = [...messages].reverse().find((message: any) => message.role === "user");

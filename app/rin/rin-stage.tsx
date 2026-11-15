@@ -85,6 +85,7 @@ export const SUPPORTED_POSES = [
 function expressionArt(expression: string): FaceArt {
   if (["smile", "curious", "surprised"].includes(expression)) return "happy";
   if (expression === "concerned") return "worried";
+  if (expression === "annoyed") return "frustrated";
   if (expression === "teasing") return "teasing-1";
   const ALL_FACES: string[] = [
     "neutral", "happy", "happy-2", "thinking", "thinking-2", "angry", "depressed",

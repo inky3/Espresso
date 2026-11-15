@@ -19,13 +19,15 @@ function renderMessage(content: string) {
 
 const SCENE_KEY = "rin-scene";
 /** The scene (room, outfit, face) as it was left, so a refresh picks up where things were. */
-function savedScene(): { room?: RoomId; outfit?: string; expression?: string } {
+function savedScene(): { room?: RoomId; outfit?: string; expression?: string; manualOutfit?: string; roomLocked?: boolean } {
   try {
     const saved = JSON.parse(window.localStorage.getItem(SCENE_KEY) || "{}");
     return {
       room: ROOMS.some((r) => r.id === saved.room) ? saved.room : undefined,
-      outfit: typeof saved.outfit === "string" ? saved.outfit : undefined,
+      outfit: SUPPORTED_OUTFITS.some((o) => o.id === saved.outfit) ? saved.outfit : undefined,
       expression: typeof saved.expression === "string" ? saved.expression : undefined,
+      manualOutfit: SUPPORTED_OUTFITS.some((o) => o.id === saved.manualOutfit) ? saved.manualOutfit : undefined,
+      roomLocked: saved.roomLocked === true,
     };
   } catch {
     return {};
@@ -49,17 +51,22 @@ function RinPage() {
   const [manualExpression, setManualExpression] = useState("");
   const [manualPose, setManualPose] = useState<PoseId | null>(null);
   const [characterOutfit, setCharacterOutfit] = useState(() => savedScene().outfit ?? "casual");
-  const [manualOutfit, setManualOutfit] = useState("");
+  const [manualOutfit, setManualOutfit] = useState(() => savedScene().manualOutfit ?? "");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState<TimeMode>("auto");
   const [room, setRoom] = useState<RoomId>(() => savedScene().room ?? "kitchen");
-  const [roomLocked, setRoomLocked] = useState(false);
+  const [roomLocked, setRoomLocked] = useState(() => savedScene().roomLocked ?? false);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(SCENE_KEY, JSON.stringify({ room, outfit: characterOutfit, expression: characterExpression }));
+      window.localStorage.setItem(SCENE_KEY, JSON.stringify({ room, outfit: characterOutfit, expression: characterExpression, manualOutfit, roomLocked }));
     } catch { /* storage unavailable: the scene just won't be remembered */ }
-  }, [room, characterOutfit, characterExpression]);
+  }, [room, characterOutfit, characterExpression, manualOutfit, roomLocked]);
+  // Latest manual picks, read when a reply arrives (the user may have changed them while Rin was thinking).
+  const manualRef = useRef({ expression: "", pose: null as PoseId | null, outfit: "" });
+  useEffect(() => {
+    manualRef.current = { expression: manualExpression, pose: manualPose, outfit: manualOutfit };
+  }, [manualExpression, manualPose, manualOutfit]);
   const [hopSignal, setHopSignal] = useState({ id: 0, strength: 1 });
   const [pose, setPose] = useState<PoseId | null>(null);
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,12 +130,14 @@ function RinPage() {
   const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown; room?: unknown }) => {
     const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
     const chosenExpression = typeof data.expression === "string" ? data.expression : null;
+    const manual = manualRef.current;
+    // The server only sends an outfit while one is locked if the user asked Rin to change; that ask becomes the new lock.
     if (chosenOutfit) {
       setCharacterOutfit(chosenOutfit);
-      if (manualOutfit) setManualOutfit(chosenOutfit);
+      if (manual.outfit) setManualOutfit(chosenOutfit);
     }
-    if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
-    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose) && !manualPose) strikePose(data.pose as PoseId);
+    if (chosenExpression && !manual.expression) setCharacterExpression(chosenExpression);
+    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose) && !manual.pose) strikePose(data.pose as PoseId);
     if (typeof data.room === "string" && ROOMS.some((r) => r.id === data.room)) setRoom(data.room as RoomId);
     return chosenExpression;
   };
@@ -257,29 +266,9 @@ function RinPage() {
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
-      // Rin chooses her own outfit and face; a manual outfit only changes if she was asked to.
-      const chosenExpression = applyRinChoices(data);
-      const chosenPose = typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose);
+      // The reply already carries the one face/pose/outfit/room for this message (decided server-side).
+      applyRinChoices(data);
       speak(data.text);
-      try {
-        const stateResponse = await fetch("/api/rin/state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-          body: JSON.stringify({ userText: text, replyText: data.text, manualExpression: manualExpression || null, manualOutfit: manualOutfit || null }),
-        });
-        const stateData = await stateResponse.json();
-        if (stateResponse.ok) {
-          const nextExpression = stateData.state?.expression;
-          // Apply heuristic reactions only when Rin and the user have not chosen manually.
-          if (typeof nextExpression === "string" && !chosenExpression && !manualExpression) {
-            setCharacterExpression(nextExpression);
-          }
-          const reactionPose = stateData.state?.reactionPose;
-          if (typeof reactionPose === "string" && (POSE_IDS as readonly string[]).includes(reactionPose) && !chosenPose && !manualPose) {
-            strikePose(reactionPose as PoseId);
-          }
-        }
-      } catch { /* Character state is an enhancement; it must not interrupt conversation. */ }
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Message could not be sent.");
       setDraft((current) => current || text);
@@ -343,9 +332,9 @@ function RinPage() {
                 <RinStage
                   room={room}
                   outfit={characterOutfit}
-                  expression={sending ? "thinking" : characterExpression}
+                  expression={sending && !manualExpression ? "thinking" : characterExpression}
                   speaking={speaking}
-                  pose={sending ? null : (pose ?? manualPose)}
+                  pose={manualPose ?? (sending ? null : pose)}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
                 />
@@ -378,20 +367,11 @@ function RinPage() {
                     </optgroup>
                   </select>
                   <label htmlFor="rin-outfit" className="sr-only">Character outfit</label>
-                  <select id="rin-outfit" value={manualOutfit} onChange={async (event) => {
+                  <select id="rin-outfit" value={manualOutfit} onChange={(event) => {
                     const value = event.target.value;
                     setManualOutfit(value);
-                    if (!user) return;
-                    try {
-                      const token = await user.getIdToken();
-                      const response = await fetch("/api/rin/state", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-                        body: JSON.stringify({ manualOutfit: value || null }),
-                      });
-                      const data = await response.json();
-                      if (response.ok && typeof data.state?.outfit === "string") { setCharacterOutfit(data.state.outfit); hop(0.7); }
-                    } catch { /* Keep the current outfit if the state request fails. */ }
+                    // "Auto" only unlocks: she keeps what she is wearing until she has a reason to change.
+                    if (value) { setCharacterOutfit(value); hop(0.7); }
                   }} className="max-w-[125px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">
                     <option value="">Auto outfit</option>
                     {SUPPORTED_OUTFITS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
