@@ -37,6 +37,21 @@ export function isNightAt(date = new Date()) {
   return minutes < 6 * 60 || minutes >= 17 * 60 + 30;
 }
 
+/** The After Dark outfit is reserved for the user's local late-night window. */
+export function isAfterDarkAt(date = new Date()) {
+  const minutes = date.getHours() * 60 + date.getMinutes();
+  return minutes >= 22 * 60 || minutes < 3 * 60;
+}
+
+/** Validates a browser-local HH:mm value using the same 22:00–03:00 window. */
+export function isAfterDarkTime(localTime: string) {
+  if (!/^\d{2}:\d{2}$/.test(localTime)) return false;
+  const [hours, minutes] = localTime.split(":").map(Number);
+  if (hours > 23 || minutes > 59) return false;
+  const totalMinutes = hours * 60 + minutes;
+  return totalMinutes >= 22 * 60 || totalMinutes < 3 * 60;
+}
+
 /** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
 export const WARDROBE = ["casual", "relaxed", "homewear", "after-dark"] as const;
 export type WardrobeId = (typeof WARDROBE)[number];
@@ -45,6 +60,7 @@ export type WardrobeId = (typeof WARDROBE)[number];
 export const EXPRESSION_IDS = [
   "neutral", "smile", "happy", "very-happy", "curious", "thinking", "hard-thinking", "surprised", "concerned", "worried", "embarrassed", "hello", "annoyed", "sleepy",
   "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing",
+  "seduce-1", "seduce-2", "seduce-3",
 ] as const;
 
 /** Strong-moment poses Rin can strike briefly. */
@@ -98,6 +114,7 @@ To move, end your reply with [[room:ID]] on its own line. You may mention it nat
 
 To change outfit, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
 You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.
+Seduction expressions are available as seduce-1 (subtle, gentle closeness), seduce-2 (confident, playful flirtation), and seduce-3 (strong, unmistakable flirtation). Use them only when the user's tone and the established conversation clearly invite flirtation; progress naturally and never force intimacy.
 For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
 }
