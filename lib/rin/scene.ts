@@ -4,7 +4,7 @@
  * replies match what the user actually sees.
  */
 
-export type OutfitArt = "casual" | "hoodie" | "shirt";
+export type OutfitArt = "casual" | "hoodie" | "shirt" | "afterdark" | "knitdress" | "pajamas";
 export const ROOMS = [
   { id: "kitchen", label: "Kitchen" },
   { id: "bedroom", label: "Bedroom" },
@@ -15,7 +15,10 @@ export type TimeOfDay = "day" | "night";
 /** Maps a catalogue outfit ID to the artwork that exists for it. */
 export function outfitArt(outfit: string): OutfitArt {
   if (outfit === "relaxed") return "hoodie";
-  if (outfit === "homewear" || outfit === "sleepwear") return "shirt";
+  if (outfit === "homewear") return "shirt";
+  if (outfit === "pajamas" || outfit === "sleepwear") return "pajamas";
+  if (outfit === "afterdark") return "afterdark";
+  if (outfit === "knitdress") return "knitdress";
   return "casual";
 }
 
@@ -23,6 +26,9 @@ const OUTFIT_DESCRIPTIONS: Record<OutfitArt, string> = {
   casual: "a cream oversized cable-knit sweater and a dark brown pleated skirt",
   hoodie: "an oversized charcoal-gray hoodie with the hood down and black lounge shorts",
   shirt: "an oversized white button-up shirt slipping off one shoulder, with short gray lounge shorts underneath",
+  afterdark: "a cropped black hoodie left unzipped over a black bra and matching lingerie, with thigh garter straps",
+  knitdress: "a cozy beige cable-knit sweater dress with a dark brown pleated skirt",
+  pajamas: "soft white pinstriped short-sleeve pajamas with matching shorts tied with a little bow, barefoot",
 };
 
 const ROOM_DESCRIPTIONS: Record<RoomId, string> = {
@@ -36,17 +42,17 @@ export function isNightAt(date = new Date()) {
 }
 
 /** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
-export const WARDROBE = ["casual", "relaxed", "homewear"] as const;
+export const WARDROBE = ["casual", "relaxed", "homewear", "afterdark", "knitdress", "pajamas"] as const;
 export type WardrobeId = (typeof WARDROBE)[number];
 
 /** Faces Rin can ask for. The stage maps them to the closest existing art. */
 export const EXPRESSION_IDS = [
-  "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "annoyed", "sleepy",
-  "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing",
+  "neutral", "smile", "happy", "curious", "thinking", "surprised", "concerned", "embarrassed", "flustered", "annoyed", "sleepy",
+  "angry", "depressed", "flustered-teasing", "frustrated", "sad", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "worried",
 ] as const;
 
 /** Strong-moment poses Rin can strike briefly. */
-export const POSE_IDS = ["chin", "cheer", "cheeks", "hands", "wave"] as const;
+export const POSE_IDS = ["chin", "cheer", "cheeks", "hands", "wave", "seduce-1", "seduce-2", "seduce-3"] as const;
 export type PoseId = (typeof POSE_IDS)[number];
 
 const POSE_NOTES: Record<PoseId, string> = {
@@ -55,12 +61,18 @@ const POSE_NOTES: Record<PoseId, string> = {
   cheeks: "hands on your cheeks, for being very flustered or embarrassed",
   hands: "hands held together at your chest, for real worry or concern",
   wave: "a small wave, for hello or goodbye",
+  "seduce-1": "a flirty, confident pose — only when the user is flirting with you and you want to tease back",
+  "seduce-2": "a playful seductive pose — only when things are getting spicy and you feel bold",
+  "seduce-3": "your most daring pose — only when you really want to make an impression",
 };
 
 const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
-  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (lazy mornings, late nights at home, getting ready for bed)`,
+  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (friendly, easy-going chat at home, lazy mornings)`,
+  afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (only after he has been flirting and teasing with you for a while and the mood has built up; never as a first or sudden change; ask him first)`,
+  knitdress: `${OUTFIT_DESCRIPTIONS.knitdress} (cute, date-ready, autumn afternoons)`,
+  pajamas: `${OUTFIT_DESCRIPTIONS.pajamas} (only at bedtime: late at night, or when you or he are heading to bed)`,
 };
 
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
@@ -85,7 +97,7 @@ YOUR WARDROBE (you change clothes yourself):
 ${wardrobe}
 ${outfitLocked === true
     ? "The user picked your current outfit themselves. Keep it unless they ask you to change."
-    : "Change outfit only when it genuinely fits the moment (getting cozy, late at night, relaxing, starting the day) or when the user asks. Do not change often; most replies keep the current outfit."}
+    : "Keep your current outfit unless there is a clear reason: the user asks, or the conversation has clearly moved into a mood that fits another outfit. Never change on a whim; most replies keep the current outfit."}
 YOUR ROOMS (you can move between them):
 ${ROOMS.map((r) => `- ${r.id}: ${ROOM_DESCRIPTIONS[r.id]}`).join("\n")}
 ${roomLocked === true
@@ -93,10 +105,50 @@ ${roomLocked === true
     : "Move only when it fits the moment (making coffee or a snack, going to bed, winding down) or when the user asks. Most replies stay in the same room."}
 To move, end your reply with [[room:ID]] on its own line. You may mention it naturally ("come, let's sit in my room").
 
+When the user asks you to wear one of these outfits or to move to one of these rooms, do it in that same reply: you can tease them about it or react in character, but you go along with it and include the tag. Do not refuse, bargain, or put it off.
 To change outfit, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
-You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${EXPRESSION_IDS.join(", ")}.
-For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Poses:
+You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${[...EXPRESSION_IDS.filter((id) => !/^teasing-\d$/.test(id)), "teasing"].join(", ")}.
+Notes: "teasing" is for playfully teasing the user. "flustered-teasing" is for when you are really trying to tease them to get their attention. "unintended-teasing" is for when you tease or say something suggestive without meaning to.
+For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Seduce poses are only for when the user is flirting and you want to flirt back — she asks first. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
+}
+
+const ASKED_OUTFIT = /\b(wear|put on|change|switch|outfit|dress|clothes|get changed|try on)\b|ใส่|เปลี่ยนชุด|ชุด/i;
+const ASKED_ROOM = /\b(go|move|come|head|let'?s)\b[^.?!]*\b(kitchen|bedroom|room|bed)\b|ไปห้อง|ไปครัว/i;
+const ASKED_AFTERDARK = /after ?dark|lingerie|something (sexier|more revealing)/i;
+const BEDTIME = /\b(sleep|sleepy|bed|bedtime|good ?night|night night|tired|nap)\b|นอน|ง่วง|ฝันดี/i;
+const FLIRT = /\b(cute|pretty|beautiful|gorgeous|hot|sexy|kiss|flirt|tease|teasing|babe|baby|darling|love you|miss you|cuddle|hug|attractive)\b|น่ารัก|สวย|เซ็กซี่|จูบ|กอด|คิดถึง|รักนะ/i;
+
+/**
+ * Decides which of Rin's own outfit/room choices actually apply.
+ * Priority: the user's manual pick > Rin's choice (only when the user asked) > no change.
+ * After Dark only after flirting has built up over several messages, or when asked for directly.
+ */
+export function gateChoices(
+  choice: { outfit?: WardrobeId; room?: RoomId },
+  ctx: { greeting: boolean; userMessages: string[]; scene: unknown; localTime?: string | null },
+): { outfit?: WardrobeId; room?: RoomId } {
+  const scene = (ctx.scene && typeof ctx.scene === "object" ? ctx.scene : {}) as Record<string, unknown>;
+  const last = ctx.userMessages.at(-1) ?? "";
+  let { outfit, room } = choice;
+
+  if (outfit) {
+    const current = typeof scene.outfit === "string" ? outfitArt(scene.outfit) : null;
+    const asked = ASKED_OUTFIT.test(last);
+    if (ctx.greeting || outfitArt(outfit) === current) outfit = undefined;
+    else if (scene.outfitLocked === true && !asked) outfit = undefined;
+    else if (outfit === "pajamas") {
+      // Bedtime only: late local time (21:00–05:59) or bed/sleep talk, unless he asked.
+      const hour = ctx.localTime ? Number(ctx.localTime.slice(0, 2)) : null;
+      const late = hour === null ? scene.time === "night" : hour >= 21 || hour < 6;
+      if (!asked && !late && !BEDTIME.test(last)) outfit = undefined;
+    } else if (outfit === "afterdark") {
+      const flirty = ctx.userMessages.slice(-6).filter((m) => FLIRT.test(m)).length;
+      if (!ASKED_AFTERDARK.test(last) && !(flirty >= 3 && FLIRT.test(last))) outfit = undefined;
+    }
+  }
+  if (room && (room === scene.room || (scene.roomLocked === true && !ASKED_ROOM.test(last)))) room = undefined;
+  return { outfit, room };
 }
 
 /** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */
@@ -111,7 +163,11 @@ export function parseDirectives(reply: string): { text: string; outfit?: Wardrob
       if (kind.toLowerCase() === "room" && ROOMS.some((r) => r.id === value)) room = value as RoomId;
       if (kind.toLowerCase() === "pose" && (POSE_IDS as readonly string[]).includes(value)) pose = value as PoseId;
       if (kind.toLowerCase() === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
-      if (kind.toLowerCase() === "expression" && (EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
+      if (kind.toLowerCase() === "expression") {
+        // "teasing" has three interchangeable images: pick one at random.
+        if (value === "teasing") expression = `teasing-${1 + Math.floor(Math.random() * 3)}`;
+        else if ((EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
+      }
       return "";
     })
     .replace(/\n{3,}/g, "\n\n")

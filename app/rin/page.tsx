@@ -8,6 +8,32 @@ import { auth } from "@/lib/firebase";
 import RinStage, { SUPPORTED_EXPRESSIONS, SUPPORTED_OUTFITS, SUPPORTED_POSES, type TimeMode } from "./rin-stage";
 import { isNightAt, POSE_IDS, ROOMS, type PoseId, type RoomId } from "@/lib/rin/scene";
 
+/** Roleplay styling: *narration* is shown dimmer and in italics; everything else is Rin speaking. */
+function renderMessage(content: string) {
+  return content.split(/(\*[^*\n]+\*)/g).map((part, index) =>
+    part.length > 2 && part.startsWith("*") && part.endsWith("*")
+      ? <span key={index} className="italic text-zinc-500">{part.slice(1, -1)}</span>
+      : part,
+  );
+}
+
+const SCENE_KEY = "rin-scene";
+/** The scene (room, outfit, face) as it was left, so a refresh picks up where things were. */
+function savedScene(): { room?: RoomId; outfit?: string; expression?: string; manualOutfit?: string; roomLocked?: boolean } {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(SCENE_KEY) || "{}");
+    return {
+      room: ROOMS.some((r) => r.id === saved.room) ? saved.room : undefined,
+      outfit: SUPPORTED_OUTFITS.some((o) => o.id === saved.outfit) ? saved.outfit : undefined,
+      expression: typeof saved.expression === "string" ? saved.expression : undefined,
+      manualOutfit: SUPPORTED_OUTFITS.some((o) => o.id === saved.manualOutfit) ? saved.manualOutfit : undefined,
+      roomLocked: saved.roomLocked === true,
+    };
+  } catch {
+    return {};
+  }
+}
+
 function RinPage() {
   const [user, setUser] = useState<User | null>(null);
   const [pin, setPin] = useState("");
@@ -21,15 +47,26 @@ function RinPage() {
   const [sending, setSending] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [chatError, setChatError] = useState("");
-  const [characterExpression, setCharacterExpression] = useState("neutral");
+  const [characterExpression, setCharacterExpression] = useState(() => savedScene().expression ?? "neutral");
   const [manualExpression, setManualExpression] = useState("");
   const [manualPose, setManualPose] = useState<PoseId | null>(null);
-  const [characterOutfit, setCharacterOutfit] = useState("casual");
-  const [manualOutfit, setManualOutfit] = useState("");
+  const [characterOutfit, setCharacterOutfit] = useState(() => savedScene().outfit ?? "casual");
+  const [manualOutfit, setManualOutfit] = useState(() => savedScene().manualOutfit ?? "");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState<TimeMode>("auto");
-  const [room, setRoom] = useState<RoomId>("kitchen");
-  const [roomLocked, setRoomLocked] = useState(false);
+  const [room, setRoom] = useState<RoomId>(() => savedScene().room ?? "kitchen");
+  const [roomLocked, setRoomLocked] = useState(() => savedScene().roomLocked ?? false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SCENE_KEY, JSON.stringify({ room, outfit: characterOutfit, expression: characterExpression, manualOutfit, roomLocked }));
+    } catch { /* storage unavailable: the scene just won't be remembered */ }
+  }, [room, characterOutfit, characterExpression, manualOutfit, roomLocked]);
+  // Latest manual picks, read when a reply arrives (the user may have changed them while Rin was thinking).
+  const manualRef = useRef({ expression: "", pose: null as PoseId | null, outfit: "" });
+  useEffect(() => {
+    manualRef.current = { expression: manualExpression, pose: manualPose, outfit: manualOutfit };
+  }, [manualExpression, manualPose, manualOutfit]);
   const [hopSignal, setHopSignal] = useState({ id: 0, strength: 1 });
   const [pose, setPose] = useState<PoseId | null>(null);
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,15 +127,24 @@ function RinPage() {
   });
 
   // Applies what Rin chose for herself (outfit, face, pose). Returns the chosen face, if any.
-  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown; room?: unknown }) => {
+  const repliesSincePoseRef = useRef(3);
+  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown; reactionPose?: unknown; room?: unknown }) => {
     const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
     const chosenExpression = typeof data.expression === "string" ? data.expression : null;
+    const manual = manualRef.current;
+    // The server only sends an outfit while one is locked if the user asked Rin to change; that ask becomes the new lock.
     if (chosenOutfit) {
       setCharacterOutfit(chosenOutfit);
-      if (manualOutfit) setManualOutfit(chosenOutfit);
+      if (manual.outfit) setManualOutfit(chosenOutfit);
     }
-    if (chosenExpression && !manualExpression) setCharacterExpression(chosenExpression);
-    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose) && !manualPose) strikePose(data.pose as PoseId);
+    if (chosenExpression && !manual.expression) setCharacterExpression(chosenExpression);
+    // Rin's own pose always plays; automatic reaction poses at most once every 3 replies, so she doesn't fidget.
+    repliesSincePoseRef.current += 1;
+    const wantedPose = typeof data.pose === "string" ? data.pose : repliesSincePoseRef.current >= 3 && typeof data.reactionPose === "string" ? data.reactionPose : null;
+    if (wantedPose && (POSE_IDS as readonly string[]).includes(wantedPose) && !manual.pose) {
+      strikePose(wantedPose as PoseId);
+      repliesSincePoseRef.current = 0;
+    }
     if (typeof data.room === "string" && ROOMS.some((r) => r.id === data.room)) setRoom(data.room as RoomId);
     return chosenExpression;
   };
@@ -109,6 +155,7 @@ function RinPage() {
     const historyResponse = await fetch("/api/rin/chat", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
     if (historyResponse.ok) {
       const historyData = await historyResponse.json();
+      if (typeof historyData.idleExpression === "string" && !manualRef.current.expression) setCharacterExpression(historyData.idleExpression);
       if (Array.isArray(historyData.messages)) setMessages(historyData.messages.filter((item: { role?: unknown; content?: unknown } | null) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string"));
     }
     if (greetedRef.current) return;
@@ -214,11 +261,13 @@ function RinPage() {
     setMessages(nextMessages);
     setSending(true);
     try {
+      const sentAt = Date.now();
       const token = await user.getIdToken();
       const response = await fetch("/api/rin/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
         body: JSON.stringify({
+          localTime: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`,
           messages: nextMessages.slice(-20),
           scene: currentScene(),
         }),
@@ -226,30 +275,12 @@ function RinPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
+      // A beat to "think" before answering, so instant replies don't snap.
+      await new Promise((resolve) => setTimeout(resolve, Math.max(0, 900 - (Date.now() - sentAt))));
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
-      // Rin chooses her own outfit and face; a manual outfit only changes if she was asked to.
-      const chosenExpression = applyRinChoices(data);
-      const chosenPose = typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose);
+      // The reply already carries the one face/pose/outfit/room for this message (decided server-side).
+      applyRinChoices(data);
       speak(data.text);
-      try {
-        const stateResponse = await fetch("/api/rin/state", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-          body: JSON.stringify({ userText: text, replyText: data.text, manualExpression: manualExpression || null, manualOutfit: manualOutfit || null }),
-        });
-        const stateData = await stateResponse.json();
-        if (stateResponse.ok) {
-          const nextExpression = stateData.state?.expression;
-          // Apply heuristic reactions only when Rin and the user have not chosen manually.
-          if (typeof nextExpression === "string" && !chosenExpression && !manualExpression) {
-            setCharacterExpression(nextExpression);
-          }
-          const reactionPose = stateData.state?.reactionPose;
-          if (typeof reactionPose === "string" && (POSE_IDS as readonly string[]).includes(reactionPose) && !chosenPose && !manualPose) {
-            strikePose(reactionPose as PoseId);
-          }
-        }
-      } catch { /* Character state is an enhancement; it must not interrupt conversation. */ }
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Message could not be sent.");
       setDraft((current) => current || text);
@@ -313,9 +344,10 @@ function RinPage() {
                 <RinStage
                   room={room}
                   outfit={characterOutfit}
-                  expression={sending ? "thinking" : characterExpression}
+                  expression={sending && !manualExpression ? "thinking" : characterExpression}
                   speaking={speaking}
-                  pose={sending ? null : (pose ?? manualPose)}
+                  listening={Boolean(draft.trim()) && !sending && !speaking}
+                  pose={manualPose ?? (sending ? null : pose)}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
                 />
@@ -348,20 +380,11 @@ function RinPage() {
                     </optgroup>
                   </select>
                   <label htmlFor="rin-outfit" className="sr-only">Character outfit</label>
-                  <select id="rin-outfit" value={manualOutfit} onChange={async (event) => {
+                  <select id="rin-outfit" value={manualOutfit} onChange={(event) => {
                     const value = event.target.value;
                     setManualOutfit(value);
-                    if (!user) return;
-                    try {
-                      const token = await user.getIdToken();
-                      const response = await fetch("/api/rin/state", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-                        body: JSON.stringify({ manualOutfit: value || null }),
-                      });
-                      const data = await response.json();
-                      if (response.ok && typeof data.state?.outfit === "string") { setCharacterOutfit(data.state.outfit); hop(0.7); }
-                    } catch { /* Keep the current outfit if the state request fails. */ }
+                    // "Auto" only unlocks: she keeps what she is wearing until she has a reason to change.
+                    if (value) { setCharacterOutfit(value); hop(0.7); }
                   }} className="max-w-[125px] rounded-full border border-white/10 bg-[#111115] px-2 py-1.5 text-[10px] text-zinc-400 outline-none">
                     <option value="">Auto outfit</option>
                     {SUPPORTED_OUTFITS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -409,8 +432,8 @@ function RinPage() {
                   </div>
                 ) : messages.map((message, index) => (
                   <div key={index} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div className={message.role === "user" ? "max-w-[88%] rounded-2xl rounded-br-md bg-[#c6a45b]/15 px-4 py-3 text-sm leading-6 text-zinc-100" : "max-w-[92%] rounded-2xl rounded-bl-md border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-sm leading-6 text-zinc-300"}>
-                      {message.content}
+                    <div className={message.role === "user" ? "max-w-[88%] rounded-2xl rounded-br-md bg-[#c6a45b]/15 px-4 py-3 text-sm leading-6 text-zinc-100" : "max-w-[92%] rounded-2xl rounded-bl-md border border-white/[0.07] bg-white/[0.035] px-4 py-3 whitespace-pre-wrap text-sm leading-6 text-zinc-200"}>
+                      {renderMessage(message.content)}
                     </div>
                   </div>
                 ))}
