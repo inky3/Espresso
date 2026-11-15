@@ -20,7 +20,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const userText = typeof body.userText === "string" ? body.userText.slice(0, 4000) : "";
     const replyText = typeof body.replyText === "string" ? body.replyText.slice(0, 4000) : "";
-    const localTime = typeof body.localTime === "string" && /^\d{2}:\d{2}$/.test(body.localTime) ? body.localTime : "";
     const overrides: Record<string, string> = {};
 
     if (body.manualExpression != null) {
@@ -40,7 +39,7 @@ export async function POST(req: Request) {
       overrides.environment = body.manualEnvironment;
     }
 
-    return NextResponse.json({ state: deriveRinState(userText, replyText, overrides, localTime) });
+    return NextResponse.json({ state: deriveRinState(userText, replyText, overrides) });
   } catch {
     return NextResponse.json({ error: "Invalid character state request." }, { status: 400 });
   }
