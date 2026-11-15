@@ -160,6 +160,7 @@ export default function RinStage({
   hopSignal,
   timeMode,
   speaking = false,
+  listening = false,
 }: {
   room?: RoomId;
   outfit: string;
@@ -171,6 +172,8 @@ export default function RinStage({
   timeMode: TimeMode;
   /** True while Rin is delivering a text reply; only the character layer moves. */
   speaking?: boolean;
+  /** True while the user is typing: a slight, attentive head tilt. */
+  listening?: boolean;
 }) {
   const hopRef = useRef<HTMLDivElement>(null);
   const [autoNight, setAutoNight] = useState(() => isNightNow());
@@ -223,7 +226,9 @@ export default function RinStage({
 
   const night = timeMode === "night" || (timeMode === "auto" && autoNight);
   const { key: active, missingThinking, poseArt } = spriteFor(outfit, expression, pose);
-  const lightTransform = reducedMotion || poseArt || !motion ? "none" : pose ? amplify(motion.transform) : motion.transform;
+  const lightTransform = reducedMotion || poseArt ? "none"
+    : motion ? (pose ? amplify(motion.transform) : motion.transform)
+    : listening ? "rotate(1deg) translateY(0.3%)" : "none";
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#140c08]" data-room={room} data-time={night ? "night" : "day"} data-sprite={active} data-pose={pose ?? ""}>

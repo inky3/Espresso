@@ -127,7 +127,8 @@ function RinPage() {
   });
 
   // Applies what Rin chose for herself (outfit, face, pose). Returns the chosen face, if any.
-  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown; room?: unknown }) => {
+  const repliesSincePoseRef = useRef(3);
+  const applyRinChoices = (data: { outfit?: unknown; expression?: unknown; pose?: unknown; reactionPose?: unknown; room?: unknown }) => {
     const chosenOutfit = typeof data.outfit === "string" ? data.outfit : null;
     const chosenExpression = typeof data.expression === "string" ? data.expression : null;
     const manual = manualRef.current;
@@ -137,7 +138,13 @@ function RinPage() {
       if (manual.outfit) setManualOutfit(chosenOutfit);
     }
     if (chosenExpression && !manual.expression) setCharacterExpression(chosenExpression);
-    if (typeof data.pose === "string" && (POSE_IDS as readonly string[]).includes(data.pose) && !manual.pose) strikePose(data.pose as PoseId);
+    // Rin's own pose always plays; automatic reaction poses at most once every 3 replies, so she doesn't fidget.
+    repliesSincePoseRef.current += 1;
+    const wantedPose = typeof data.pose === "string" ? data.pose : repliesSincePoseRef.current >= 3 && typeof data.reactionPose === "string" ? data.reactionPose : null;
+    if (wantedPose && (POSE_IDS as readonly string[]).includes(wantedPose) && !manual.pose) {
+      strikePose(wantedPose as PoseId);
+      repliesSincePoseRef.current = 0;
+    }
     if (typeof data.room === "string" && ROOMS.some((r) => r.id === data.room)) setRoom(data.room as RoomId);
     return chosenExpression;
   };
@@ -148,6 +155,7 @@ function RinPage() {
     const historyResponse = await fetch("/api/rin/chat", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
     if (historyResponse.ok) {
       const historyData = await historyResponse.json();
+      if (typeof historyData.idleExpression === "string" && !manualRef.current.expression) setCharacterExpression(historyData.idleExpression);
       if (Array.isArray(historyData.messages)) setMessages(historyData.messages.filter((item: { role?: unknown; content?: unknown } | null) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string"));
     }
     if (greetedRef.current) return;
@@ -253,6 +261,7 @@ function RinPage() {
     setMessages(nextMessages);
     setSending(true);
     try {
+      const sentAt = Date.now();
       const token = await user.getIdToken();
       const response = await fetch("/api/rin/chat", {
         method: "POST",
@@ -265,6 +274,8 @@ function RinPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Rin couldn't reply.");
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
+      // A beat to "think" before answering, so instant replies don't snap.
+      await new Promise((resolve) => setTimeout(resolve, Math.max(0, 900 - (Date.now() - sentAt))));
       setMessages((current) => [...current, { role: "assistant", content: data.text }]);
       // The reply already carries the one face/pose/outfit/room for this message (decided server-side).
       applyRinChoices(data);
@@ -334,6 +345,7 @@ function RinPage() {
                   outfit={characterOutfit}
                   expression={sending && !manualExpression ? "thinking" : characterExpression}
                   speaking={speaking}
+                  listening={Boolean(draft.trim()) && !sending && !speaking}
                   pose={manualPose ?? (sending ? null : pose)}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
