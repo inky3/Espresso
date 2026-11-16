@@ -220,7 +220,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
 
     const lastUser = [...messages].reverse().find((message: any) => message.role === "user")?.content || "";
     const userMessages = greeting ? [] : (messages as { role: string; content: string }[]).filter((m) => m.role === "user").map((m) => m.content);
-    const { outfit, room } = gateChoices(parsed, { greeting, userMessages, scene: body?.scene, localTime });
+    const { outfit, room } = gateChoices(parsed, { greeting, userMessages, scene: body?.scene, localTime, recent: greeting ? [] : [...(messages as { content: string }[]).slice(-3).map((m) => m.content), reply] });
     // One state per reply: Rin's own face/pose first, else a reaction to what the user said.
     const reaction = greeting ? null : deriveRinState(lastUser, reply);
     // Face priority: Rin's own choice > a clear reaction to his message > her current mood (never a blank reset).
