@@ -185,6 +185,17 @@ function RinPage() {
     }
   };
 
+  // Clears this conversation (she keeps what she knows about you) and lets her greet you again.
+  const startFresh = async () => {
+    if (!user || sending || !window.confirm("Start a fresh conversation? Rin keeps what she knows about you.")) return;
+    const token = await user.getIdToken();
+    const response = await fetch("/api/rin/chat", { method: "DELETE", headers: { Authorization: "Bearer " + token } }).catch(() => null);
+    if (!response?.ok) return;
+    setMessages([]);
+    greetedRef.current = false;
+    await openSpace(user);
+  };
+
   const openSpaceRef = useRef(openSpace);
   useEffect(() => {
     openSpaceRef.current = openSpace;
@@ -335,7 +346,10 @@ function RinPage() {
               <p className="font-mono text-[9px] uppercase tracking-[0.32em] text-[#c6a45b] sm:text-[10px]">Espresso <span className="px-1 text-zinc-700">/</span> Private Space</p>
               <p className="mt-1 text-xs text-zinc-500">A quieter corner, just for you.</p>
             </div>
+            <div className="flex gap-2">
+            <button onClick={startFresh} disabled={sending} className="rounded-full border border-white/10 px-4 py-2 text-[11px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-50">Start fresh</button>
             <button onClick={lock} disabled={locking} className="rounded-full border border-white/10 px-4 py-2 text-[11px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-50">{locking ? "Locking…" : "Lock space"}</button>
+            </div>
           </header>
 
           <div className="grid flex-1 grid-cols-1 gap-4 py-4 lg:min-h-[calc(100dvh-110px)] lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] lg:gap-6 lg:py-6">

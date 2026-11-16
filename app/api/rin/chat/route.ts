@@ -124,6 +124,17 @@ export async function GET(req: Request) {
   return NextResponse.json({ messages: memory.history, lastActiveAt: memory.lastActiveAt, idleExpression: moodFace(decayMood(memory.mood)) });
 }
 
+/** Start fresh: clears the conversation and its story, keeps long-term facts; mood back to calm. */
+export async function DELETE(req: Request) {
+  const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
+  if (verified.error) return verified.error;
+  if (!verifyRinSession(req, verified.user.uid)) return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const memory = await readMemory(verified.user.uid, token);
+  await persistMemory(verified.user.uid, token, memory.summary, "", [], { facts: memory.facts, mood: CALM, story: "" });
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: Request) {
   const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
   if (verified.error) return verified.error;
