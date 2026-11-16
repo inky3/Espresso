@@ -152,15 +152,16 @@ export function gateChoices(
   return { outfit, room };
 }
 
-/** Keeps only the first line that is purely an *italic action*; extra stage directions are dropped. */
+/** Keeps only the first *italic action*; extra stage directions are dropped. */
 export function limitActions(text: string): string {
   let seen = false;
-  return text.split("\n").filter((line) => {
-    if (!/^\s*\*[^*]+\*\s*$/.test(line)) return true;
-    if (seen) return false;
+  // An action is an *italic span* of 3+ words (shorter ones are just emphasis, like *really*).
+  return text.replace(/\*([^*\n]+)\*[ \t]*/g, (match, inner: string) => {
+    if (inner.trim().split(/\s+/).length < 3) return match;
+    if (seen) return "";
     seen = true;
-    return true;
-  }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    return match;
+  }).split("\n").map((line) => line.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */

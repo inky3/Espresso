@@ -212,6 +212,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
     const result = await response.json();
     console.log("[RIN MODEL]", result.model);
     const rawReply = result.choices?.[0]?.message?.content;
+    console.log("[RIN MODEL]", result.model ?? "unknown", result.provider ?? "");
     const parsed = parseDirectives(typeof rawReply === "string" ? rawReply : "");
     const reply = limitActions(parsed.text);
     if (!reply) {
