@@ -196,7 +196,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
       },
       body: JSON.stringify({
         // OpenRouter tries these in order, so a wrong or unavailable first ID falls back to the old model.
-        models: [process.env.RIN_MODEL || "deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"],
+        models: [process.env.RIN_MODEL || "deepseek/deepseek-v4.1-flash-1017"],
         messages: [{ role: "system", content: system }, ...conversation],
         temperature: 0.75,
       }),
