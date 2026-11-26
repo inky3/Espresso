@@ -115,7 +115,7 @@ const ASKED_OUTFIT = /\b(wear|put on|change|switch|outfit|dress|clothes|get chan
 const ASKED_ROOM = /\b(go|move|come|head|let'?s)\b[^.?!]*\b(kitchen|bedroom|room|bed)\b|ไปห้อง|ไปครัว/i;
 const ASKED_AFTERDARK = /after ?dark|lingerie|something (sexier|more revealing)/i;
 const BEDTIME = /\b(sleep|sleepy|bed|bedtime|good ?night|night night|tired|nap)\b|นอน|ง่วง|ฝันดี/i;
-const DIRTY = /\b(horny|turned on|turn me on|aroused|naked|nude|undress|strip|dirty|sex|fuck|cum|moan|wet for|hard for|touch me|touch you|take (it|this|that) off)\b|เงี่ยน|เซ็กส์|ถอด/i;
+export const DIRTY = /\b(horny|turned on|turn me on|aroused|naked|nude|undress|strip|dirty|sex|fuck|cum|moan|wet for|hard for|touch me|touch you|take (it|this|that) off)\b|เงี่ยน|เซ็กส์|ถอด/i;
 
 /**
  * Decides which of Rin's own outfit/room choices actually apply.

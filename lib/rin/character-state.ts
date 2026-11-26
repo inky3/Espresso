@@ -79,9 +79,6 @@ export function deriveRinState(
   } else if (/(thank|glad|love that|haha|lol|ดีใจ|ขอบคุณ|เยี่ยม|555)/i.test(context)) {
     expression = "smile";
     expressionReason = "Positive conversational tone";
-  } else if (/(why|how|think|consider|plan|explain|compare|ทำไม|อย่างไร|วางแผน|วิเคราะห์)/i.test(context)) {
-    expression = "thinking";
-    expressionReason = "Reflective or problem-solving conversation";
   } else if (/(tease|joke|funny|playful|แซว|ตลก|ล้อเล่น)/i.test(context)) {
     expression = "curious";
     expressionReason = "Lighthearted conversational tone";

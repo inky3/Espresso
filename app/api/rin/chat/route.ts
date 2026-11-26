@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { describeScene, gateChoices, limitActions, parseDirectives } from "@/lib/rin/scene";
+import { describeScene, DIRTY, gateChoices, limitActions, parseDirectives } from "@/lib/rin/scene";
 import { deriveRinState } from "@/lib/rin/character-state";
 import { applyFactOps, CALM, decayMood, mindSection, moodFace, parseReflection, reflectionPrompt, RIN_PERSONA, stepMood, type Fact, type Mood } from "@/lib/rin/mind";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
@@ -227,9 +227,12 @@ Mention it naturally only when it is relevant, for example if the user asks what
     // One state per reply: Rin's own face/pose first, else a reaction to what the user said.
     const reaction = greeting ? null : deriveRinState(lastUser, reply);
     // Face priority: Rin's own choice > a clear reaction to his message > her current mood (never a blank reset).
-    const expression = parsed.expression ?? (reaction && reaction.expression !== "neutral" ? reaction.expression : moodFace(mood));
+    // If she didn't tag a face, read her own words: a flirty or dirty reply gets a teasing face and maybe a seduce pose.
+    const seductive = !greeting && (DIRTY.test(reply) || /seduc|kiss|naughty|bit(e|ing) (my|your) lip|closer to you/i.test(reply));
+    const expression = parsed.expression
+      ?? (seductive ? "teasing" : reaction && reaction.expression !== "neutral" ? reaction.expression : moodFace(mood));
     const pose = parsed.pose;
-    const reactionPose = pose ? undefined : reaction?.reactionPose ?? undefined;
+    const reactionPose = pose ? undefined : seductive ? `seduce-${1 + Math.floor(Math.random() * 3)}` : reaction?.reactionPose ?? undefined;
     const exchange = greeting ? `Rin (spoke first): ${reply.slice(0, 500)}` : `You: ${lastUser.slice(0, 350)}\nRin: ${reply.slice(0, 500)}`;
     const trace = [memory.trace, exchange].filter(Boolean).join("\n\n").slice(-10000);
     const lastUserMessage = [...messages].reverse().find((message: any) => message.role === "user");
