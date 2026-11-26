@@ -95,7 +95,7 @@ async function reflect(input: { story: string; facts: Fact[]; mood: Mood; recent
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        models: [process.env.RIN_MODEL || "deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"],
+        models: ["deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"], // memory/mood bookkeeping stays on DeepSeek whatever RIN_MODEL is,
         messages: [{ role: "user", content: reflectionPrompt(input) }],
         temperature: 0.2,
       }),
