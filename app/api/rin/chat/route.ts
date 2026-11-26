@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { describeScene, gateChoices, parseDirectives } from "@/lib/rin/scene";
+import { describeScene, gateChoices, limitActions, parseDirectives } from "@/lib/rin/scene";
 import { deriveRinState } from "@/lib/rin/character-state";
 import { applyFactOps, CALM, decayMood, mindSection, moodFace, parseReflection, reflectionPrompt, RIN_PERSONA, stepMood, type Fact, type Mood } from "@/lib/rin/mind";
 import { FIREBASE_PROJECT_ID } from "@/lib/firebase-config";
@@ -95,7 +95,7 @@ async function reflect(input: { story: string; facts: Fact[]; mood: Mood; recent
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        models: [process.env.RIN_MODEL || "deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"],
+        models: ["deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"], // memory/mood bookkeeping stays on DeepSeek whatever RIN_MODEL is
         messages: [{ role: "user", content: reflectionPrompt(input) }],
         temperature: 0.2,
       }),
@@ -122,6 +122,17 @@ export async function GET(req: Request) {
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const memory = await readMemory(verified.user.uid, token);
   return NextResponse.json({ messages: memory.history, lastActiveAt: memory.lastActiveAt, idleExpression: moodFace(decayMood(memory.mood)) });
+}
+
+/** Start fresh: clears the conversation and its story, keeps long-term facts; mood back to calm. */
+export async function DELETE(req: Request) {
+  const verified = await requireFirebaseUser(req, { deniedMessage: RIN_PRIVATE_MESSAGE });
+  if (verified.error) return verified.error;
+  if (!verifyRinSession(req, verified.user.uid)) return NextResponse.json({ error: "Your Rin session has expired. Unlock Rin again." }, { status: 401 });
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const memory = await readMemory(verified.user.uid, token);
+  await persistMemory(verified.user.uid, token, memory.summary, "", [], { facts: memory.facts, mood: CALM, story: "" });
+  return NextResponse.json({ ok: true });
 }
 
 export async function POST(req: Request) {
@@ -185,7 +196,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
       },
       body: JSON.stringify({
         // OpenRouter tries these in order, so a wrong or unavailable first ID falls back to the old model.
-        models: [process.env.RIN_MODEL || "deepseek/deepseek-v4.1-flash-1017", "qwen/qwen3.8-27b"],
+        models: [process.env.RIN_MODEL || "thedrummer/cydonia-24b-v4.1"], // uncensored roleplay model; RIN_MODEL in Vercel overrides it,
         messages: [{ role: "system", content: system }, ...conversation],
         temperature: 0.75,
       }),
@@ -201,15 +212,16 @@ Mention it naturally only when it is relevant, for example if the user asks what
     const result = await response.json();
     console.log("[RIN MODEL]", result.model);
     const rawReply = result.choices?.[0]?.message?.content;
+    console.log("[RIN MODEL]", result.model ?? "unknown", result.provider ?? "");
     const parsed = parseDirectives(typeof rawReply === "string" ? rawReply : "");
-    const reply = parsed.text;
+    const reply = limitActions(parsed.text);
     if (!reply) {
       return NextResponse.json({ error: "Rin returned an empty response. Please try again." }, { status: 502 });
     }
 
     const lastUser = [...messages].reverse().find((message: any) => message.role === "user")?.content || "";
     const userMessages = greeting ? [] : (messages as { role: string; content: string }[]).filter((m) => m.role === "user").map((m) => m.content);
-    const { outfit, room } = gateChoices(parsed, { greeting, userMessages, scene: body?.scene, localTime });
+    const { outfit, room } = gateChoices(parsed, { greeting, userMessages, scene: body?.scene, localTime, recent: greeting ? [] : [...(messages as { content: string }[]).slice(-3).map((m) => m.content), reply] });
     // One state per reply: Rin's own face/pose first, else a reaction to what the user said.
     const reaction = greeting ? null : deriveRinState(lastUser, reply);
     // Face priority: Rin's own choice > a clear reaction to his message > her current mood (never a blank reset).

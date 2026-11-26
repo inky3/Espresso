@@ -69,10 +69,10 @@ const POSE_NOTES: Record<PoseId, string> = {
 const WARDROBE_NOTES: Record<WardrobeId, string> = {
   casual: `${OUTFIT_DESCRIPTIONS.casual} (everyday, daytime)`,
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
-  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (friendly, easy-going chat at home, lazy mornings)`,
-  afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (only after he has been flirting and teasing with you for a while and the mood has built up; never as a first or sudden change; ask him first)`,
+  homewear: `${OUTFIT_DESCRIPTIONS.shirt} (sleepwear: only at bedtime, late at night or when you or he are heading to bed)`,
+  afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (only when things get dirty between you, whether he starts it or you do; ask him first)`,
   knitdress: `${OUTFIT_DESCRIPTIONS.knitdress} (cute, date-ready, autumn afternoons)`,
-  pajamas: `${OUTFIT_DESCRIPTIONS.pajamas} (only at bedtime: late at night, or when you or he are heading to bed)`,
+  pajamas: `${OUTFIT_DESCRIPTIONS.pajamas} (sleepwear: only at bedtime, late at night or when you or he are heading to bed)`,
 };
 
 /** Builds the scene note for Rin's system prompt. Unknown values are ignored. */
@@ -117,16 +117,16 @@ const ASKED_OUTFIT = /\b(wear|put on|change|switch|outfit|dress|clothes|get chan
 const ASKED_ROOM = /\b(go|move|come|head|let'?s)\b[^.?!]*\b(kitchen|bedroom|room|bed)\b|ไปห้อง|ไปครัว/i;
 const ASKED_AFTERDARK = /after ?dark|lingerie|something (sexier|more revealing)/i;
 const BEDTIME = /\b(sleep|sleepy|bed|bedtime|good ?night|night night|tired|nap)\b|นอน|ง่วง|ฝันดี/i;
-const FLIRT = /\b(cute|pretty|beautiful|gorgeous|hot|sexy|kiss|flirt|tease|teasing|babe|baby|darling|love you|miss you|cuddle|hug|attractive)\b|น่ารัก|สวย|เซ็กซี่|จูบ|กอด|คิดถึง|รักนะ/i;
+const DIRTY = /\b(horny|turned on|turn me on|aroused|naked|nude|undress|strip|dirty|sex|fuck|cum|moan|wet for|hard for|touch me|touch you|take (it|this|that) off)\b|เงี่ยน|เซ็กส์|ถอด/i;
 
 /**
  * Decides which of Rin's own outfit/room choices actually apply.
  * Priority: the user's manual pick > Rin's choice (only when the user asked) > no change.
- * After Dark only after flirting has built up over several messages, or when asked for directly.
+ * Sleepwear (pajamas, shirt) only at bedtime. After Dark only when things are dirty between them (either may start it), or when asked.
  */
 export function gateChoices(
   choice: { outfit?: WardrobeId; room?: RoomId },
-  ctx: { greeting: boolean; userMessages: string[]; scene: unknown; localTime?: string | null },
+  ctx: { greeting: boolean; userMessages: string[]; scene: unknown; localTime?: string | null; recent?: string[] },
 ): { outfit?: WardrobeId; room?: RoomId } {
   const scene = (ctx.scene && typeof ctx.scene === "object" ? ctx.scene : {}) as Record<string, unknown>;
   const last = ctx.userMessages.at(-1) ?? "";
@@ -137,18 +137,31 @@ export function gateChoices(
     const asked = ASKED_OUTFIT.test(last);
     if (ctx.greeting || outfitArt(outfit) === current) outfit = undefined;
     else if (scene.outfitLocked === true && !asked) outfit = undefined;
-    else if (outfit === "pajamas") {
+    else if (outfit === "pajamas" || outfit === "homewear") {
       // Bedtime only: late local time (21:00–05:59) or bed/sleep talk, unless he asked.
       const hour = ctx.localTime ? Number(ctx.localTime.slice(0, 2)) : null;
       const late = hour === null ? scene.time === "night" : hour >= 21 || hour < 6;
       if (!asked && !late && !BEDTIME.test(last)) outfit = undefined;
     } else if (outfit === "afterdark") {
-      const flirty = ctx.userMessages.slice(-6).filter((m) => FLIRT.test(m)).length;
-      if (!ASKED_AFTERDARK.test(last) && !(flirty >= 3 && FLIRT.test(last))) outfit = undefined;
+      // Only in a dirty moment: his recent messages or her own reply (she may be the one who starts it).
+      const recent = ctx.recent ?? ctx.userMessages.slice(-2);
+      if (!ASKED_AFTERDARK.test(last) && !recent.some((m) => DIRTY.test(m))) outfit = undefined;
     }
   }
   if (room && (room === scene.room || (scene.roomLocked === true && !ASKED_ROOM.test(last)))) room = undefined;
   return { outfit, room };
+}
+
+/** Keeps only the first *italic action*; extra stage directions are dropped. */
+export function limitActions(text: string): string {
+  let seen = false;
+  // An action is an *italic span* of 3+ words (shorter ones are just emphasis, like *really*).
+  return text.replace(/\*([^*\n]+)\*[ \t]*/g, (match, inner: string) => {
+    if (inner.trim().split(/\s+/).length < 3) return match;
+    if (seen) return "";
+    seen = true;
+    return match;
+  }).split("\n").map((line) => line.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */
