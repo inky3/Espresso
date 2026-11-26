@@ -347,7 +347,6 @@ function RinPage() {
               <p className="mt-1 text-xs text-zinc-500">A quieter corner, just for you.</p>
             </div>
             <div className="flex gap-2">
-            <button onClick={startFresh} disabled={sending} className="rounded-full border border-white/10 px-4 py-2 text-[11px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-50">Start fresh</button>
             <button onClick={lock} disabled={locking} className="rounded-full border border-white/10 px-4 py-2 text-[11px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-50">{locking ? "Locking…" : "Lock space"}</button>
             </div>
           </header>
@@ -433,10 +432,13 @@ function RinPage() {
             </section>
 
             <aside className={`fixed inset-x-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#101013]/[0.98] p-4 shadow-[0_-12px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height] duration-300 lg:static lg:z-auto lg:h-auto lg:max-h-[calc(100dvh-140px)] lg:min-h-0 lg:rounded-[28px] lg:p-7 lg:shadow-none lg:backdrop-blur-none ${mobileChatOpen ? "h-[68dvh]" : "h-[72px]"}`}>
-              <button type="button" onClick={() => setMobileChatOpen((open) => !open)} className="flex min-h-8 items-center justify-between text-left lg:pointer-events-none">
+              <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setMobileChatOpen((open) => !open)} className="flex min-h-8 flex-1 items-center justify-between text-left lg:pointer-events-none">
                 <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">Conversation <span className="ml-2 text-zinc-600 lg:hidden">{mobileChatOpen ? "Close" : "Open chat"}</span></span>
                 <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#c6a45b]" /><span className="text-zinc-500 lg:hidden">{mobileChatOpen ? "⌄" : "⌃"}</span></span>
               </button>
+              <button type="button" onClick={startFresh} disabled={sending} className={`${mobileChatOpen ? "block" : "hidden"} rounded-full border border-white/10 px-3 py-1.5 text-[10px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-50 lg:block`}>Start fresh</button>
+              </div>
               <div className={`${mobileChatOpen ? "flex" : "hidden"} my-5 min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1 lg:flex`} aria-live="polite">
                 {messages.length === 0 ? (
                   <div className="flex h-full min-h-[180px] flex-col items-center justify-center text-center">
