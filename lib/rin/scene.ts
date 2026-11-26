@@ -107,9 +107,9 @@ To move, end your reply with [[room:ID]] on its own line. You may mention it nat
 
 When the user asks you to wear one of these outfits or to move to one of these rooms, do it in that same reply: you can tease them about it or react in character, but you go along with it and include the tag. Do not refuse, bargain, or put it off.
 To change outfit, end your reply with [[outfit:ID]] on its own line, using an ID from the list. You may mention changing in your own words, but never mention or explain the tag.
-You may also end your reply with [[expression:ID]] to choose the face you show for this reply. IDs: ${[...EXPRESSION_IDS.filter((id) => !/^teasing-\d$/.test(id)), "teasing"].join(", ")}.
+Put [[expression:ID]] right before the sentence it belongs to, so your face follows what you are saying; you may change it up to 3 times in one reply as your feelings shift. IDs: ${[...EXPRESSION_IDS.filter((id) => !/^teasing-\d$/.test(id)), "teasing"].join(", ")}.
 Notes: "teasing" is for playfully teasing the user. "flustered-teasing" is for when you are really trying to tease them to get their attention. "unintended-teasing" is for when you tease or say something suggestive without meaning to.
-For a strong moment only, you may add [[pose:ID]]; it shows for a few seconds, then you relax. Use it rarely, at most once every several replies. Seduce poses are only for when the user is flirting and you want to flirt back — she asks first. Poses:
+For a strong moment, put [[pose:ID]] right before the sentence where you move; it shows for a few seconds, then you relax. Up to 2 poses in one reply when the moment calls for it; most replies need none. Seduce poses are only for when the user is flirting and you want to flirt back — she asks first. Poses:
 ${POSE_IDS.map((id) => `- ${id}: ${POSE_NOTES[id]}`).join("\n")}`;
 }
 
@@ -137,6 +137,8 @@ export function gateChoices(
     const asked = ASKED_OUTFIT.test(last);
     if (ctx.greeting || outfitArt(outfit) === current) outfit = undefined;
     else if (scene.outfitLocked === true && !asked) outfit = undefined;
+    // Everyday outfits only change when he asks; she shouldn't drift back to casual on her own.
+    else if (!asked && (outfit === "casual" || outfit === "relaxed" || outfit === "knitdress")) outfit = undefined;
     else if (outfit === "pajamas" || outfit === "homewear") {
       // Bedtime only: late local time (21:00–05:59) or bed/sleep talk, unless he asked.
       const hour = ctx.localTime ? Number(ctx.localTime.slice(0, 2)) : null;
@@ -164,26 +166,47 @@ export function limitActions(text: string): string {
   }).split("\n").map((line) => line.trimEnd()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-/** Removes Rin's [[outfit:…]] / [[expression:…]] tags from a reply and returns the valid choices. */
-export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string; pose?: PoseId; room?: RoomId } {
+export type Beat = { text: string; expression?: string; pose?: PoseId };
+
+/**
+ * Removes Rin's [[…]] tags and returns her choices. Face/pose tags placed mid-reply split it into
+ * beats, so her expression can change sentence by sentence as the reply appears.
+ */
+export function parseDirectives(reply: string): { text: string; outfit?: WardrobeId; expression?: string; pose?: PoseId; room?: RoomId; beats: Beat[] } {
   let room: RoomId | undefined;
   let outfit: WardrobeId | undefined;
-  let expression: string | undefined;
-  let pose: PoseId | undefined;
-  const text = reply
-    .replace(/\[\[\s*(outfit|expression|pose|room)\s*:\s*([a-z_-]+)\s*\]\]/gi, (_, kind: string, id: string) => {
-      const value = id.toLowerCase();
-      if (kind.toLowerCase() === "room" && ROOMS.some((r) => r.id === value)) room = value as RoomId;
-      if (kind.toLowerCase() === "pose" && (POSE_IDS as readonly string[]).includes(value)) pose = value as PoseId;
-      if (kind.toLowerCase() === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
-      if (kind.toLowerCase() === "expression") {
-        // "teasing" has three interchangeable images: pick one at random.
-        if (value === "teasing") expression = `teasing-${1 + Math.floor(Math.random() * 3)}`;
-        else if ((EXPRESSION_IDS as readonly string[]).includes(value)) expression = value;
-      }
-      return "";
-    })
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return { text, outfit, expression, pose, room };
+  const beats: Beat[] = [{ text: "" }];
+  for (const part of reply.split(/(\[\[\s*(?:outfit|expression|pose|room)\s*:\s*[a-z0-9_-]+\s*\]\])/i)) {
+    const tag = part.match(/^\[\[\s*(outfit|expression|pose|room)\s*:\s*([a-z0-9_-]+)\s*\]\]$/i);
+    if (!tag) { beats[beats.length - 1].text += part; continue; }
+    const kind = tag[1].toLowerCase(), value = tag[2].toLowerCase();
+    if (kind === "room" && ROOMS.some((r) => r.id === value)) room = value as RoomId;
+    if (kind === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
+    if (kind !== "expression" && kind !== "pose") continue;
+    let beat = beats[beats.length - 1];
+    if (beat.text.trim()) { beat = { text: "" }; beats.push(beat); }
+    if (kind === "pose" && (POSE_IDS as readonly string[]).includes(value)) beat.pose = value as PoseId;
+    if (kind === "expression") {
+      // "teasing" has three interchangeable images: pick one at random.
+      if (value === "teasing") beat.expression = `teasing-${1 + Math.floor(Math.random() * 3)}`;
+      else if ((EXPRESSION_IDS as readonly string[]).includes(value)) beat.expression = value;
+    }
+  }
+  // Tags at the very end (the old "end your reply with…" style) set the face for the whole reply.
+  const last = beats[beats.length - 1];
+  if (beats.length > 1 && !last.text.trim()) {
+    beats.pop();
+    beats[0].expression ??= last.expression;
+    beats[0].pose ??= last.pose;
+  }
+  beats.forEach((beat, i) => {
+    beat.text = beat.text.replace(/\n{3,}/g, "\n\n");
+    // a removed tag leaves a space on both sides: keep one
+    if (i > 0 && /\s$/.test(beats[i - 1].text)) beat.text = beat.text.replace(/^[ \t]+/, "");
+  });
+  beats[0].text = beats[0].text.trimStart();
+  beats[beats.length - 1].text = beats[beats.length - 1].text.trimEnd();
+  const kept = beats.filter((b, i) => i === 0 || b.text.trim());
+  const text = kept.map((b) => b.text).join("").replace(/\n{3,}/g, "\n\n").trim();
+  return { text, outfit, expression: kept[0].expression, pose: kept[0].pose, room, beats: kept };
 }

@@ -213,8 +213,8 @@ Mention it naturally only when it is relevant, for example if the user asks what
     console.log("[RIN MODEL]", result.model);
     const rawReply = result.choices?.[0]?.message?.content;
     console.log("[RIN MODEL]", result.model ?? "unknown", result.provider ?? "");
-    const parsed = parseDirectives(typeof rawReply === "string" ? rawReply : "");
-    const reply = limitActions(parsed.text);
+    const parsed = parseDirectives(limitActions(typeof rawReply === "string" ? rawReply : ""));
+    const reply = parsed.text;
     if (!reply) {
       return NextResponse.json({ error: "Rin returned an empty response. Please try again." }, { status: 502 });
     }
@@ -238,7 +238,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
       await persistMemory(verified.user.uid, token, memory.summary, trace, history, mind);
     });
 
-    return NextResponse.json({ text: reply, ...(outfit ? { outfit } : {}), ...(expression ? { expression } : {}), ...(pose ? { pose } : {}), ...(reactionPose ? { reactionPose } : {}), ...(room ? { room } : {}) });
+    return NextResponse.json({ text: reply, ...(outfit ? { outfit } : {}), ...(expression ? { expression } : {}), ...(pose ? { pose } : {}), ...(reactionPose ? { reactionPose } : {}), ...(room ? { room } : {}), ...(parsed.beats.length > 1 ? { beats: parsed.beats } : {}) });
   } catch (error) {
     console.error("[RIN CHAT ERROR]", error);
     return NextResponse.json({ error: "Rin's reply couldn't be completed. Please try again." }, { status: 500 });

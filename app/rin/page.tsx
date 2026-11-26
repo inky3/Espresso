@@ -116,6 +116,52 @@ function RinPage() {
     poseTimerRef.current = setTimeout(() => setPose(null), 4500);
   };
 
+  // Typing effect: the reply appears word by word; each beat (sentence group) can bring its own face or pose.
+  const revealTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const revealingRef = useRef<{ index: number; text: string } | null>(null);
+  const finishReveal = () => {
+    revealTimersRef.current.forEach(clearTimeout);
+    revealTimersRef.current = [];
+    const pending = revealingRef.current;
+    revealingRef.current = null;
+    if (pending) setMessages((current) => current.map((m, i) => (i === pending.index ? { ...m, content: pending.text } : m)));
+  };
+  const deliver = (data: { text: string; outfit?: unknown; expression?: unknown; pose?: unknown; reactionPose?: unknown; room?: unknown; beats?: unknown }) => {
+    finishReveal();
+    applyRinChoices(data);
+    speak(data.text);
+    const beats = (Array.isArray(data.beats) && data.beats.length ? data.beats : [{ text: data.text }]) as { text: string; expression?: string; pose?: string }[];
+    let index = -1;
+    setMessages((current) => { index = current.length; return [...current, { role: "assistant", content: "" }]; });
+    revealingRef.current = { text: data.text, get index() { return index; } };
+    const words = beats.reduce((n, b) => n + b.text.split(/\s+/).filter(Boolean).length, 0);
+    const perWord = Math.min(70, Math.max(25, 5000 / Math.max(1, words)));
+    let shown = "";
+    let delay = 0;
+    const at = (ms: number, fn: () => void) => revealTimersRef.current.push(setTimeout(fn, ms));
+    beats.forEach((beat, i) => {
+      if (i > 0) {
+        delay += 300;
+        at(delay, () => {
+          const manual = manualRef.current;
+          if (beat.expression && !manual.expression) setCharacterExpression(beat.expression);
+          if (beat.pose && (POSE_IDS as readonly string[]).includes(beat.pose) && !manual.pose) strikePose(beat.pose as PoseId);
+          hop(0.45);
+        });
+      }
+      for (const piece of beat.text.split(/(\s+)/)) {
+        shown += piece;
+        if (!piece.trim()) continue;
+        delay += perWord + (/[.!?。！？]$/.test(piece) ? 180 : 0);
+        const snapshot = shown;
+        at(delay, () => {
+          setMessages((current) => current.map((m, j) => (j === index ? { ...m, content: snapshot.trimStart() } : m)));
+        });
+      }
+    });
+    at(delay + 50, finishReveal);
+  };
+
   const greetedRef = useRef(false);
 
   const currentScene = () => ({
@@ -175,9 +221,7 @@ function RinPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok && typeof data.text === "string" && data.text.trim()) {
-        setMessages((existing) => [...existing, { role: "assistant", content: data.text }]);
-        applyRinChoices(data);
-        speak(data.text);
+        deliver(data);
       }
     } catch { /* A missed greeting must never block the conversation. */ }
     finally {
@@ -272,6 +316,7 @@ function RinPage() {
     setMessages(nextMessages);
     setSending(true);
     try {
+      finishReveal();
       const sentAt = Date.now();
       const token = await user.getIdToken();
       const response = await fetch("/api/rin/chat", {
@@ -288,10 +333,7 @@ function RinPage() {
       if (typeof data.text !== "string" || !data.text.trim()) throw new Error("Rin returned an empty response.");
       // A beat to "think" before answering, so instant replies don't snap.
       await new Promise((resolve) => setTimeout(resolve, Math.max(0, 900 - (Date.now() - sentAt))));
-      setMessages((current) => [...current, { role: "assistant", content: data.text }]);
-      // The reply already carries the one face/pose/outfit/room for this message (decided server-side).
-      applyRinChoices(data);
-      speak(data.text);
+      deliver(data);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "Message could not be sent.");
       setDraft((current) => current || text);
@@ -360,7 +402,7 @@ function RinPage() {
                   expression={sending && !manualExpression ? "thinking" : characterExpression}
                   speaking={speaking}
                   listening={Boolean(draft.trim()) && !sending && !speaking}
-                  pose={manualPose ?? (sending ? null : pose)}
+                  pose={manualPose ?? (sending ? "chin" : pose)}
                   hopSignal={hopSignal}
                   timeMode={timeMode}
                 />
