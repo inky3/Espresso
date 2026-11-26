@@ -4,7 +4,7 @@
  * replies match what the user actually sees.
  */
 
-export type OutfitArt = "casual" | "hoodie" | "shirt" | "afterdark" | "knitdress" | "pajamas";
+export type OutfitArt = "casual" | "hoodie" | "shirt" | "afterdark" | "pajamas";
 export const ROOMS = [
   { id: "kitchen", label: "Kitchen" },
   { id: "bedroom", label: "Bedroom" },
@@ -18,7 +18,6 @@ export function outfitArt(outfit: string): OutfitArt {
   if (outfit === "homewear") return "shirt";
   if (outfit === "pajamas" || outfit === "sleepwear") return "pajamas";
   if (outfit === "afterdark") return "afterdark";
-  if (outfit === "knitdress") return "knitdress";
   return "casual";
 }
 
@@ -27,7 +26,6 @@ const OUTFIT_DESCRIPTIONS: Record<OutfitArt, string> = {
   hoodie: "an oversized charcoal-gray hoodie with the hood down and black lounge shorts",
   shirt: "an oversized white button-up shirt slipping off one shoulder, with short gray lounge shorts underneath",
   afterdark: "a cropped black hoodie left unzipped over a black bra and matching lingerie, with thigh garter straps",
-  knitdress: "a cozy beige cable-knit sweater dress with a dark brown pleated skirt",
   pajamas: "soft white pinstriped short-sleeve pajamas with matching shorts tied with a little bow, barefoot",
 };
 
@@ -42,7 +40,7 @@ export function isNightAt(date = new Date()) {
 }
 
 /** Outfits Rin can choose for herself (catalogue IDs that have artwork). */
-export const WARDROBE = ["casual", "relaxed", "homewear", "afterdark", "knitdress", "pajamas"] as const;
+export const WARDROBE = ["casual", "relaxed", "homewear", "afterdark", "pajamas"] as const;
 export type WardrobeId = (typeof WARDROBE)[number];
 
 /** Faces Rin can ask for. The stage maps them to the closest existing art. */
@@ -71,7 +69,6 @@ const WARDROBE_NOTES: Record<WardrobeId, string> = {
   relaxed: `${OUTFIT_DESCRIPTIONS.hoodie} (cozy, relaxing, chilly evenings)`,
   homewear: `${OUTFIT_DESCRIPTIONS.shirt} (sleepwear: only at bedtime, late at night or when you or he are heading to bed)`,
   afterdark: `${OUTFIT_DESCRIPTIONS.afterdark} (only when things get dirty between you, whether he starts it or you do; ask him first)`,
-  knitdress: `${OUTFIT_DESCRIPTIONS.knitdress} (cute, date-ready, autumn afternoons)`,
   pajamas: `${OUTFIT_DESCRIPTIONS.pajamas} (sleepwear: only at bedtime, late at night or when you or he are heading to bed)`,
 };
 
@@ -138,7 +135,7 @@ export function gateChoices(
     if (ctx.greeting || outfitArt(outfit) === current) outfit = undefined;
     else if (scene.outfitLocked === true && !asked) outfit = undefined;
     // Everyday outfits only change when he asks; she shouldn't drift back to casual on her own.
-    else if (!asked && (outfit === "casual" || outfit === "relaxed" || outfit === "knitdress")) outfit = undefined;
+    else if (!asked && (outfit === "casual" || outfit === "relaxed")) outfit = undefined;
     else if (outfit === "pajamas" || outfit === "homewear") {
       // Bedtime only: late local time (21:00–05:59) or bed/sleep talk, unless he asked.
       const hour = ctx.localTime ? Number(ctx.localTime.slice(0, 2)) : null;

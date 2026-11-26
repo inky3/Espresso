@@ -22,7 +22,6 @@ const AVAILABLE_FACES: Record<OutfitArt, FaceArt[]> = {
   hoodie: ["neutral", "happy", "thinking", "angry", "depressed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing"],
   shirt: ["neutral", "happy", "thinking", "angry", "depressed", "frustrated", "sad", "sleepy", "teasing", "teasing-2", "teasing-3", "tired", "flustered-teasing", "unintended-teasing"],
   afterdark: ["neutral", "happy", "happy-2", "thinking", "thinking-2", "angry", "depressed", "embarrassed", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "worried"],
-  knitdress: ["neutral", "happy", "worried"],
   pajamas: ["neutral", "happy", "happy-2", "thinking", "angry", "depressed", "embarrassed", "flustered", "flustered-teasing", "frustrated", "sad", "sleepy", "teasing-1", "teasing-2", "teasing-3", "tired", "unintended-teasing", "worried"],
 };
 
@@ -32,7 +31,6 @@ const AVAILABLE_POSES: Record<OutfitArt, PoseId[]> = {
   hoodie: ["chin", "cheer", "cheeks", "hands", "wave", "seduce-1", "seduce-2", "seduce-3"],
   shirt: ["chin", "cheer", "cheeks", "hands", "wave", "seduce-1", "seduce-2", "seduce-3"],
   afterdark: ["wave", "seduce-1", "seduce-2", "seduce-3"],
-  knitdress: ["chin", "cheeks", "wave"],
   pajamas: ["wave", "seduce-1", "seduce-2", "seduce-3"],
 };
 
@@ -49,7 +47,6 @@ export const SUPPORTED_OUTFITS = [
   { id: "relaxed", label: "Hoodie" },
   { id: "homewear", label: "Oversized shirt" },
   { id: "afterdark", label: "After Dark" },
-  { id: "knitdress", label: "Knit Dress" },
   { id: "pajamas", label: "Pajamas" },
 ] as const;
 
@@ -138,12 +135,7 @@ export function spriteFor(outfit: string, expression: string, pose?: PoseId | nu
       ? { "teasing-1": "teasing", worried: "sad", embarrassed: "flustered-teasing" }
       : o === "hoodie"
         ? { worried: "sad", embarrassed: "flustered-teasing" }
-        : o === "knitdress"
-          ? { angry: "worried", depressed: "worried", sad: "worried", frustrated: "worried", embarrassed: "neutral",
-              "flustered-teasing": "neutral", sleepy: "neutral", tired: "neutral",
-              "teasing-1": "happy", "teasing-2": "happy", "teasing-3": "happy",
-              thinking: "neutral", "unintended-teasing": "neutral" }
-          : {};
+        : {};
   // Follow the fallback chain (e.g. flustered → embarrassed → flustered-teasing) until a face exists.
   const fallbacks: Partial<Record<FaceArt, FaceArt>> = { flustered: "embarrassed", "happy-2": "happy", "thinking-2": "thinking", ...outfitFallbacks };
   const candidates: FaceArt[] = [];

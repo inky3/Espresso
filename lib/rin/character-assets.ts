@@ -27,7 +27,6 @@ export const RIN_ASSET_CATALOG = {
     sleepwear: { label: "Sleepwear (Night)", path: "/rin/outfits/sleepwear.webp" },
     formal: { label: "Formal (Occasion)", path: "/rin/outfits/formal.webp" },
     afterdark: { label: "After Dark", path: "/rin/outfits/afterdark.webp" },
-    knitdress: { label: "Knit Dress", path: "/rin/outfits/knitdress.webp" },
     pajamas: { label: "Pajamas", path: "/rin/outfits/pajamas.webp" },
   },
   poses: {
