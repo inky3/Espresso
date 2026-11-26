@@ -88,6 +88,8 @@ async function persistMemory(uid: string, token: string, summary: string, trace:
   }
 }
 
+const TEASING_FACES = ["teasing-1", "teasing-2", "teasing-3", "flustered-teasing"];
+
 /** Background pass: asks the model how the story, mood and memory change after this exchange. Returns undefined on failure. */
 async function reflect(input: { story: string; facts: Fact[]; mood: Mood; recent: Msg[] }) {
   try {
@@ -230,7 +232,7 @@ Mention it naturally only when it is relevant, for example if the user asks what
     // If she didn't tag a face, read her own words: a flirty or dirty reply gets a teasing face and maybe a seduce pose.
     const seductive = !greeting && (DIRTY.test(reply) || /seduc|kiss|naughty|bit(e|ing) (my|your) lip|closer to you/i.test(reply));
     const expression = parsed.expression
-      ?? (seductive ? "teasing" : reaction && reaction.expression !== "neutral" ? reaction.expression : moodFace(mood));
+      ?? (seductive ? TEASING_FACES[Math.floor(Math.random() * TEASING_FACES.length)] : reaction && reaction.expression !== "neutral" ? reaction.expression : moodFace(mood));
     const pose = parsed.pose;
     const reactionPose = pose ? undefined : seductive ? `seduce-${1 + Math.floor(Math.random() * 3)}` : reaction?.reactionPose ?? undefined;
     const exchange = greeting ? `Rin (spoke first): ${reply.slice(0, 500)}` : `You: ${lastUser.slice(0, 350)}\nRin: ${reply.slice(0, 500)}`;

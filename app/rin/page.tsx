@@ -110,10 +110,10 @@ function RinPage() {
   }, []);
 
   // A strong pose is a moment: show it briefly, then relax back to the normal stance.
-  const strikePose = (next: PoseId) => {
+  const strikePose = (next: PoseId, holdMs = 4500) => {
     if (poseTimerRef.current) clearTimeout(poseTimerRef.current);
     setPose(next);
-    poseTimerRef.current = setTimeout(() => setPose(null), 4500);
+    poseTimerRef.current = setTimeout(() => setPose(null), holdMs);
   };
 
   // Typing effect: the reply appears word by word; each beat (sentence group) can bring its own face or pose.
@@ -186,9 +186,13 @@ function RinPage() {
     if (chosenExpression && !manual.expression) setCharacterExpression(chosenExpression);
     // Rin's own pose always plays; automatic reaction poses at most once every 3 replies, so she doesn't fidget.
     repliesSincePoseRef.current += 1;
-    const wantedPose = typeof data.pose === "string" ? data.pose : repliesSincePoseRef.current >= 3 && typeof data.reactionPose === "string" ? data.reactionPose : null;
+    // Seduce reactions to her own flirty reply aren't rate-limited.
+    const reaction = typeof data.reactionPose === "string" ? data.reactionPose : null;
+    const wantedPose = typeof data.pose === "string" ? data.pose : reaction && (repliesSincePoseRef.current >= 3 || reaction.startsWith("seduce")) ? reaction : null;
     if (wantedPose && (POSE_IDS as readonly string[]).includes(wantedPose) && !manual.pose) {
-      strikePose(wantedPose as PoseId);
+      // Hold the pose while her reply is being typed out, not just a few seconds.
+      const text = typeof (data as { text?: unknown }).text === "string" ? (data as { text: string }).text : "";
+      strikePose(wantedPose as PoseId, Math.min(12_000, Math.max(4500, text.length * 50)));
       repliesSincePoseRef.current = 0;
     }
     if (typeof data.room === "string" && ROOMS.some((r) => r.id === data.room)) setRoom(data.room as RoomId);
