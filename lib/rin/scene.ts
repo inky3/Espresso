@@ -79,6 +79,7 @@ export function describeScene(scene: unknown): string | null {
   const lines: string[] = [];
   if (typeof outfit === "string" && outfit.length <= 32) {
     lines.push(`You are wearing ${OUTFIT_DESCRIPTIONS[outfitArt(outfit)]}.`);
+    lines.push("He can see you on screen in exactly this outfit, so your *actions* must match it: tease with it, adjust it, let it slip a little, but never describe taking it off or being undressed unless you change outfit with a tag.");
   }
   if (typeof room === "string" && room in ROOM_DESCRIPTIONS) {
     lines.push(`You are in ${ROOM_DESCRIPTIONS[room as RoomId]}.`);
@@ -173,10 +174,20 @@ export function parseDirectives(reply: string): { text: string; outfit?: Wardrob
   let room: RoomId | undefined;
   let outfit: WardrobeId | undefined;
   const beats: Beat[] = [{ text: "" }];
-  for (const part of reply.split(/(\[\[\s*(?:outfit|expression|pose|room)\s*:\s*[a-z0-9_-]+\s*\]\])/i)) {
-    const tag = part.match(/^\[\[\s*(outfit|expression|pose|room)\s*:\s*([a-z0-9_-]+)\s*\]\]$/i);
-    if (!tag) { beats[beats.length - 1].text += part; continue; }
-    const kind = tag[1].toLowerCase(), value = tag[2].toLowerCase();
+  for (const part of reply.split(/(\[\[[^\]\n]{0,40}\]\])/)) {
+    const tag = part.match(/^\[\[\s*(?:(outfit|expression|pose|room)\s*:\s*)?([a-z0-9_-]+)\s*\]\]$/i);
+    if (!tag) {
+      // Any other [[…]] is a malformed tag: never show it.
+      if (!/^\[\[[^\]\n]{0,40}\]\]$/.test(part)) beats[beats.length - 1].text += part;
+      continue;
+    }
+    const value = tag[2].toLowerCase();
+    // A bare [[seduce-1]] or [[happy]] (wrong format some models use) is read by what the ID is.
+    const kind = tag[1]?.toLowerCase()
+      ?? ((POSE_IDS as readonly string[]).includes(value) ? "pose"
+        : [...EXPRESSION_IDS, "teasing"].includes(value) ? "expression"
+        : (WARDROBE as readonly string[]).includes(value) ? "outfit"
+        : ROOMS.some((r) => r.id === value) ? "room" : "");
     if (kind === "room" && ROOMS.some((r) => r.id === value)) room = value as RoomId;
     if (kind === "outfit" && (WARDROBE as readonly string[]).includes(value)) outfit = value as WardrobeId;
     if (kind !== "expression" && kind !== "pose") continue;
@@ -204,6 +215,7 @@ export function parseDirectives(reply: string): { text: string; outfit?: Wardrob
   beats[0].text = beats[0].text.trimStart();
   beats[beats.length - 1].text = beats[beats.length - 1].text.trimEnd();
   const kept = beats.filter((b, i) => i === 0 || b.text.trim());
+  kept[0].text = kept[0].text.replace(/^(\*[^*\n]+\*)[ \t]+(?=\S)/, "$1\n\n");
   const text = kept.map((b) => b.text).join("").replace(/\n{3,}/g, "\n\n").trim();
   return { text, outfit, expression: kept[0].expression, pose: kept[0].pose, room, beats: kept };
 }
